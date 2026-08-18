@@ -87,6 +87,27 @@ def plan_campaign_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+from backend.app.models.generation import GeneratedBackgroundMetadata, GenerationRequest
+from backend.app.services.gemini_generator import GeminiBackgroundGenerator
+
+generator = GeminiBackgroundGenerator()
+
+
+@app.post("/api/backgrounds/generate", response_model=GeneratedBackgroundMetadata)
+def generate_background_endpoint(req: GenerationRequest = Body(...)):
+    """Generates a missing background using Gemini or deterministic mock provider."""
+    try:
+        bg_meta = generator.generate_background(
+            activity=req.activity,
+            territory=req.territory,
+            custom_prompt_suffix=req.custom_prompt_suffix,
+            force_mock=req.force_mock,
+        )
+        return bg_meta
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
