@@ -8,56 +8,123 @@
       "minimum": 20,
       "maximum": 30
     },
-    "objective": "Generate randomized, locally relevant YETI ads for Los Angeles audiences while keeping product color, environment and typography controlled by campaign rules.",
+    "objective": "Generate randomized, locally relevant YETI ads for Los Angeles audiences while keeping product color, environment and typography strictly controlled by campaign rules.",
     "campaignLine": "Go Anywhere with YETI"
   },
   "generation": {
     "mode": "seeded-random",
     "seed": null,
+    "conceptsPerAudience": 1,
+    "totalAudienceGroups": 6,
+    "adsPerAudience": 3,
+    "totalOutputsPerRun": 18,
     "randomizeOncePerAudience": true,
     "renderAllFormatsFromSameConcept": true,
-    "adsPerAudience": 3,
-    "totalAudienceGroups": 6,
-    "totalOutputsPerRun": 18,
     "selectionRules": {
       "background": "Randomly select one background from the audience's assigned backgroundPoolId.",
       "tagline": "Randomly select one tagline from the audience's assigned taglinePoolId.",
-      "taglineColor": "Use black tagline (#000000) for beach activity. Use white tagline (#FFFFFF) for camping and tailgating (college) activities.",
+      "taglineColor": "Use black tagline (#000000) for beach activity. Use white tagline (#FFFFFF) for camping and tailgating activities.",
       "productColor": "Use orange when audience age maximum is 24 or younger. Use white when audience age minimum is 25 or older.",
       "formats": "Render the selected concept once in every format listed in outputFormats."
     },
     "repeatProtection": {
+      "scope": "run-and-prior-manifest",
       "avoidImmediateBackgroundRepeat": true,
-      "avoidImmediateTaglineRepeat": true
+      "avoidImmediateTaglineRepeat": true,
+      "priorManifestPath": "outputs/yeti-la-go-anywhere-2026/generation-manifest.json"
+    }
+  },
+  "assetCatalog": {
+    "product-cooler-orange": "assets/products/cooler_orange.png",
+    "product-cooler-white": "assets/products/cooler_white.png",
+    "bg-tailgate": "assets/backgrounds/Tailgate.jpg",
+    "bg-beach": "assets/backgrounds/Beach.jpg",
+    "bg-camping": "assets/backgrounds/Camping.jpg",
+    "tagline-overlay-black": "assets/taglines/TAGLINE_black.png",
+    "tagline-overlay-white": "assets/taglines/TAGLINE_white.png",
+    "brand-logo": "assets/brand/Yeti_Logo_1.png",
+    "font-bold": "assets/fonts/DejaVuSans-Bold.ttf",
+    "font-regular": "assets/fonts/DejaVuSans.ttf"
+  },
+  "layoutReference": {
+    "square": "ad_examples/1_1.png",
+    "landscape": "ad_examples/16_9.png",
+    "vertical": "ad_examples/9_16.png"
+  },
+  "activityRules": {
+    "beach": {
+      "allowedBackgroundPoolIds": [
+        "beach-west-coast"
+      ],
+      "taglineAssetId": "tagline-overlay-black",
+      "taglinePoolId": "beach-taglines",
+      "taglineTextColor": "#000000",
+      "taglineColorName": "Black"
+    },
+    "camping": {
+      "allowedBackgroundPoolIds": [
+        "camping-la-mountains"
+      ],
+      "taglineAssetId": "tagline-overlay-white",
+      "taglinePoolId": "camping-taglines",
+      "taglineTextColor": "#FFFFFF",
+      "taglineColorName": "White"
+    },
+    "tailgating": {
+      "allowedBackgroundPoolIds": [
+        "tailgating-westwood",
+        "tailgating-south-central"
+      ],
+      "taglineAssetId": "tagline-overlay-white",
+      "taglinePoolId": "tailgating-taglines",
+      "taglineTextColor": "#FFFFFF",
+      "taglineColorName": "White"
     }
   },
   "creativeRules": {
     "tagline": {
-      "rules": "Beach has the black tagline (#000000). Camping and College/Tailgating have the white tagline (#FFFFFF).",
-      "beach": {
-        "colorName": "Black",
-        "hex": "#000000",
-        "assetPath": "assets/taglines/TAGLINE_black.png"
-      },
-      "camping": {
-        "colorName": "White",
-        "hex": "#FFFFFF",
-        "assetPath": "assets/taglines/TAGLINE_white.png"
-      },
-      "tailgating": {
-        "colorName": "White",
-        "hex": "#FFFFFF",
-        "assetPath": "assets/taglines/TAGLINE_white.png"
-      },
+      "placement": "lower-left",
       "maximumLines": 2,
-      "preferredPlacement": "lower-left",
-      "requireContrastBehindText": true
+      "activityRules": {
+        "beach": {
+          "colorName": "Black",
+          "hex": "#000000",
+          "assetCatalogId": "tagline-overlay-black",
+          "contrastRequirement": "Requires light negative space in lower-left for high black copy legibility."
+        },
+        "camping": {
+          "colorName": "White",
+          "hex": "#FFFFFF",
+          "assetCatalogId": "tagline-overlay-white",
+          "contrastRequirement": "Requires controlled darker foreground/shadows in lower-left for white copy legibility."
+        },
+        "tailgating": {
+          "colorName": "White",
+          "hex": "#FFFFFF",
+          "assetCatalogId": "tagline-overlay-white",
+          "contrastRequirement": "Requires controlled darker ground/asphalt in lower-left for white copy legibility."
+        }
+      }
     },
     "product": {
       "preserveOfficialLogo": true,
       "preserveProductShape": true,
       "doNotGenerateTextOnProduct": true,
-      "remainPrimaryForegroundElement": true
+      "remainPrimaryForegroundElement": true,
+      "ageBandColorRules": {
+        "younger": {
+          "minAge": 20,
+          "maxAge": 24,
+          "color": "orange",
+          "assetCatalogId": "product-cooler-orange"
+        },
+        "older": {
+          "minAge": 25,
+          "maxAge": 30,
+          "color": "white",
+          "assetCatalogId": "product-cooler-white"
+        }
+      }
     },
     "background": {
       "productMustRemainDominant": true,
@@ -77,11 +144,13 @@
   "productAssets": {
     "orange": {
       "colorName": "Orange",
+      "assetCatalogId": "product-cooler-orange",
       "assetPath": "assets/products/cooler_orange.png",
       "assignedAgeBand": "20-24"
     },
     "white": {
       "colorName": "White",
+      "assetCatalogId": "product-cooler-white",
       "assetPath": "assets/products/cooler_white.png",
       "assignedAgeBand": "25-30"
     }
@@ -90,6 +159,7 @@
     "black": {
       "colorName": "Black",
       "hex": "#000000",
+      "assetCatalogId": "tagline-overlay-black",
       "assetPath": "assets/taglines/TAGLINE_black.png",
       "activities": [
         "beach"
@@ -98,6 +168,7 @@
     "white": {
       "colorName": "White",
       "hex": "#FFFFFF",
+      "assetCatalogId": "tagline-overlay-white",
       "assetPath": "assets/taglines/TAGLINE_white.png",
       "activities": [
         "camping",
@@ -110,44 +181,36 @@
       "id": "tailgating-westwood",
       "activity": "tailgating",
       "territory": "Westwood",
-      "visualDirection": "A lively but uncluttered Los Angeles game-day tailgate near Westwood, with neutral campus-area architecture and no university logos or trademarks.",
+      "visualDirection": "A lively but uncluttered Los Angeles game-day tailgate near Westwood, with neutral campus-area architecture, dark lower space for white tagline, and no university logos or trademarks.",
       "assets": [
-        "assets/backgrounds/tailgating/westwood-tailgate-01.jpg",
-        "assets/backgrounds/tailgating/westwood-tailgate-02.jpg",
-        "assets/backgrounds/tailgating/westwood-tailgate-03.jpg"
+        "assets/backgrounds/Tailgate.jpg"
       ]
     },
     {
       "id": "tailgating-south-central",
       "activity": "tailgating",
       "territory": "South Central Los Angeles",
-      "visualDirection": "An energetic but visually controlled urban game-day tailgate in South Central Los Angeles, without USC logos, mascots or trademarked graphics.",
+      "visualDirection": "An energetic but visually controlled urban game-day tailgate in South Central Los Angeles, with darker pavement space for white copy and zero USC trademarks.",
       "assets": [
-        "assets/backgrounds/tailgating/south-central-tailgate-01.jpg",
-        "assets/backgrounds/tailgating/south-central-tailgate-02.jpg",
-        "assets/backgrounds/tailgating/south-central-tailgate-03.jpg"
+        "assets/backgrounds/Tailgate.jpg"
       ]
     },
     {
       "id": "beach-west-coast",
       "activity": "beach",
       "territory": "Westside Los Angeles coast",
-      "visualDirection": "A bright Westside Los Angeles beach environment with soft sand, coastal atmosphere and open negative space for a black tagline.",
+      "visualDirection": "A bright Westside Los Angeles beach environment with soft sand, coastal atmosphere and open light negative space for a black tagline.",
       "assets": [
-        "assets/backgrounds/beach/west-coast-beach-01.jpg",
-        "assets/backgrounds/beach/west-coast-beach-02.jpg",
-        "assets/backgrounds/beach/west-coast-beach-03.jpg"
+        "assets/backgrounds/Beach.jpg"
       ]
     },
     {
       "id": "camping-la-mountains",
       "activity": "camping",
       "territory": "Los Angeles mountain outskirts",
-      "visualDirection": "A calm mountain camping environment in the Los Angeles outskirts with trees, distant ridgelines and sufficient contrast for a white tagline.",
+      "visualDirection": "A calm mountain camping environment in the Los Angeles outskirts with trees, distant ridgelines and controlled darker foreground for a white tagline.",
       "assets": [
-        "assets/backgrounds/camping/la-mountains-camp-01.jpg",
-        "assets/backgrounds/camping/la-mountains-camp-02.jpg",
-        "assets/backgrounds/camping/la-mountains-camp-03.jpg"
+        "assets/backgrounds/Camping.jpg"
       ]
     }
   ],
@@ -156,6 +219,7 @@
       "id": "tailgating-taglines",
       "activity": "tailgating",
       "textColor": "#FFFFFF",
+      "colorName": "White",
       "taglines": [
         "Game Day Starts Here.",
         "Pack the Cold. Bring the Crowd.",
@@ -166,6 +230,7 @@
       "id": "beach-taglines",
       "activity": "beach",
       "textColor": "#000000",
+      "colorName": "Black",
       "taglines": [
         "Go West. Stay Cold.",
         "Cold Drinks. Long Coast Days.",
@@ -176,6 +241,7 @@
       "id": "camping-taglines",
       "activity": "camping",
       "textColor": "#FFFFFF",
+      "colorName": "White",
       "taglines": [
         "Go Higher. Stay Colder.",
         "Built for the First Campout.",
@@ -315,12 +381,22 @@
       "selectedBackground",
       "productShadow",
       "selectedProductAsset",
-      "tagline",
+      "selectedTaglineAsset",
       "brandLogo"
     ],
-    "logoAssetPath": "assets/brand/yeti-logo.svg",
+    "logoAssetPath": "assets/brand/Yeti_Logo_1.png",
     "taglineColorRule": "Beach: #000000 (Black), Camping/Tailgating: #FFFFFF (White)",
     "defaultCallToAction": "Explore YETI"
+  },
+  "integrations": {
+    "dropbox": {
+      "dropboxBasePath": "/YETI_Social_Automation/LA_2026",
+      "uploadGeneratedOutputs": false
+    },
+    "gemini": {
+      "enabledForMissingBackgroundsOnly": true,
+      "model": "imagen-3.0-generate-002"
+    }
   },
   "qualityChecks": [
     "background activity matches audience activity",
