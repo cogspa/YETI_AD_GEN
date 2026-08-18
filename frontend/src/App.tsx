@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
+
 import { Header } from './components/Header';
 import { BriefUploadSection } from './components/BriefUploadSection';
 import { CampaignSummary } from './components/CampaignSummary';

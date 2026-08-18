@@ -1,6 +1,6 @@
-/** Typed API client for YETI Ad Generator backend */
+import type { BriefValidationResult, CampaignBrief } from '../types/campaign';
+export type { CampaignBrief, BriefValidationResult };
 
-import type { BriefValidationResult } from '../types/campaign';
 
 export interface ResolvedAssetInfo {
   role: string;
@@ -32,7 +32,8 @@ export async function fetchAssetReadiness(): Promise<AssetReadinessReport | null
       throw new Error(`Server returned HTTP ${res.status}: ${res.statusText}`);
     }
     return await res.json();
-  } catch (err) {
+  } catch {
+
     return null;
   }
 }
@@ -121,7 +122,8 @@ export async function fetchStorageStatus(): Promise<StorageStatus | null> {
     const res = await fetch('/api/storage/status');
     if (!res.ok) return null;
     return await res.json();
-  } catch (err) {
+  } catch {
+
     return null;
   }
 }

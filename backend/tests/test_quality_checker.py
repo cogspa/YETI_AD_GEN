@@ -31,7 +31,7 @@ def valid_run_result(sample_brief):
 
 def test_secret_redaction():
     """Verify that all secret patterns (Dropbox tokens, Gemini keys, Bearer auth) are deterministically redacted."""
-    raw_log = "Uploaded with token sl.u.AF329847293847293847293847293847293847293847293847293847293847293847293847 and key AIzaSyA1234567890123456789012345678901 and Bearer secret_bearer_token_1234567890"
+    raw_log = "Uploaded with token sl.u.AF329847293847293847293847293847293847293847293847293847293847293847293847 and key AIzaSy_FAKE_TEST_KEY_12345678901234567890 and Bearer secret_bearer_token_1234567890"
     redacted = redact_secrets(raw_log)
 
     assert "sl.u." not in redacted
@@ -39,6 +39,7 @@ def test_secret_redaction():
     assert "AIzaSy" not in redacted
     assert "[REDACTED_GEMINI_KEY]" in redacted or "[REDACTED_KEY]" in redacted
     assert "secret_bearer_token_1234567890" not in redacted
+
 
 
 def test_quality_checker_passes_valid_run(valid_run_result):

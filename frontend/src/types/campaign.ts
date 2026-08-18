@@ -75,8 +75,9 @@ export interface CampaignBrief {
     totalAudienceGroups?: number;
     totalOutputsPerRun?: number;
     selectionRules?: Record<string, string>;
-    repeatProtection?: Record<string, boolean>;
+    repeatProtection?: Record<string, any>;
   };
+
   creativeRules?: Record<string, any>;
   productAssets?: Record<string, ProductAsset>;
   taglineAssets?: Record<string, TaglineAsset>;
