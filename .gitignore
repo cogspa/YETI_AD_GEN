@@ -34,6 +34,8 @@ ENV/
 # Outputs & temporary generation files
 outputs/*
 !outputs/.gitkeep
+!outputs/test_fixtures/
+!outputs/test_fixtures/*
 
 # Logs
 npm-debug.log*
