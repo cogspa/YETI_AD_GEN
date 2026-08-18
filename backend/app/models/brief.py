@@ -1,6 +1,6 @@
 """Pydantic models and strict validation contract for YETI campaign brief."""
 
-from typing import List, Dict, Optional, Literal
+from typing import List, Dict, Optional, Literal, Any
 from pydantic import BaseModel, Field, field_validator, model_validator
 import re
 
@@ -74,13 +74,12 @@ class RepeatProtection(BaseModel):
     avoidImmediateTaglineRepeat: bool = True
     priorManifestPath: Optional[str] = "campaigns/yeti-la-go-anywhere-2026/generation-manifest.json"
 
-    @field_validator("priorManifestPath")
+    @field_validator("priorManifestPath", mode="before")
     @classmethod
-    def check_manifest_path(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return None
-        return validate_portable_path(v, "repeatProtection.priorManifestPath")
-
+    def check_manifest_path(cls, v: Any) -> Optional[str]:
+        if not v:
+            return "campaigns/yeti-la-go-anywhere-2026/generation-manifest.json"
+        return validate_portable_path(str(v), "repeatProtection.priorManifestPath")
 
 
 class GenerationSettings(BaseModel):
@@ -93,7 +92,8 @@ class GenerationSettings(BaseModel):
     randomizeOncePerAudience: bool = True
     renderAllFormatsFromSameConcept: bool = True
     selectionRules: Optional[Dict[str, str]] = None
-    repeatProtection: RepeatProtection
+    repeatProtection: Optional[RepeatProtection] = Field(default_factory=RepeatProtection)
+
 
     @model_validator(mode="after")
     def validate_exact_quantities(self):
