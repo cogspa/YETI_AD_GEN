@@ -4,10 +4,12 @@ import os
 import json
 import time
 import zipfile
+import concurrent.futures
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Callable, List
 from PIL import Image
+
 
 
 from backend.app.models.brief import CampaignBriefModel
@@ -375,28 +377,23 @@ class CampaignPipelineRunner:
                 f"campaigns/{brief_model.campaign.id}/generation-manifest.json",
                 overwrite=True,
             )
-            # Upload quality report
-            storage.upload(
-                str(report_local),
-                f"campaigns/{brief_model.campaign.id}/runs/{run_id}/generation-report.json",
-                overwrite=True,
-            )
-            # Upload secret-safe pipeline log
-            storage.upload(
-                str(log_local),
-                f"campaigns/{brief_model.campaign.id}/runs/{run_id}/pipeline.log",
-                overwrite=True,
-            )
-            # Upload contact sheet
-            storage.upload(
-                str(contact_sheet_local),
-                f"campaigns/{brief_model.campaign.id}/runs/{run_id}/contact-sheet.jpg",
-                overwrite=True,
-            )
-            # Upload each ad
+
+            # Concurrent upload of 18 ads, contact sheet, report, and pipeline log
+            upload_tasks = [
+                (str(report_local), f"campaigns/{brief_model.campaign.id}/runs/{run_id}/generation-report.json"),
+                (str(log_local), f"campaigns/{brief_model.campaign.id}/runs/{run_id}/pipeline.log"),
+                (str(contact_sheet_local), f"campaigns/{brief_model.campaign.id}/runs/{run_id}/contact-sheet.jpg"),
+            ]
             for ad in ads:
                 if ad.storage_path:
-                    storage.upload(ad.local_path, ad.storage_path, overwrite=True)
+                    upload_tasks.append((ad.local_path, ad.storage_path))
+
+            def _upload_file_task(task_tuple):
+                local_src, rem_dest = task_tuple
+                storage.upload(local_src, rem_dest, overwrite=True)
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+                list(executor.map(_upload_file_task, upload_tasks))
 
             # Retrieve folder or contact-sheet share link
             dropbox_shared_link = storage.get_temporary_link(
@@ -404,6 +401,7 @@ class CampaignPipelineRunner:
             )
         except Exception as e:
             plan_result.warnings.append(f"Remote storage upload warning: {str(e)}")
+
 
         duration = round(time.time() - start_time, 2)
         emit_event("Complete", 100, 18, f"Successfully generated all 18 ads in {duration}s!")
