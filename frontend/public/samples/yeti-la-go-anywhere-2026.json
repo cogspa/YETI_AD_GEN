@@ -225,10 +225,10 @@
       "activity": "tailgating",
       "textColor": "#FFFFFF",
       "colorName": "White",
+      "assetCatalogId": "tagline-overlay-white",
+      "assetPath": "assets/taglines/TAGLINE_white.png",
       "taglines": [
-        "Game Day Starts Here.",
-        "Pack the Cold. Bring the Crowd.",
-        "Cold From Kickoff to the Final Whistle."
+        "GO ANYWHERE"
       ]
     },
     {
@@ -236,10 +236,10 @@
       "activity": "beach",
       "textColor": "#000000",
       "colorName": "Black",
+      "assetCatalogId": "tagline-overlay-black",
+      "assetPath": "assets/taglines/TAGLINE_black.png",
       "taglines": [
-        "Go West. Stay Cold.",
-        "Cold Drinks. Long Coast Days.",
-        "Keep the Coast Cold."
+        "GO ANYWHERE"
       ]
     },
     {
@@ -247,10 +247,10 @@
       "activity": "camping",
       "textColor": "#FFFFFF",
       "colorName": "White",
+      "assetCatalogId": "tagline-overlay-white",
+      "assetPath": "assets/taglines/TAGLINE_white.png",
       "taglines": [
-        "Go Higher. Stay Colder.",
-        "Built for the First Campout.",
-        "Weekend Altitude. All-Day Cold."
+        "GO ANYWHERE"
       ]
     }
   ],
