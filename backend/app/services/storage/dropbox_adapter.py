@@ -35,34 +35,61 @@ class DropboxStorageAdapter(StorageAdapter):
     def __init__(
         self,
         access_token: Optional[str] = None,
+        refresh_token: Optional[str] = None,
+        app_key: Optional[str] = None,
+        app_secret: Optional[str] = None,
         campaign_root: Optional[str] = None,
         cache_dir: Optional[str] = None,
     ):
         self.access_token = access_token or os.getenv("DROPBOX_ACCESS_TOKEN")
-        self.campaign_root = (campaign_root or os.getenv("DROPBOX_CAMPAIGN_ROOT", "/yeti-ad-generator")).rstrip("/")
+        self.refresh_token = refresh_token or os.getenv("DROPBOX_REFRESH_TOKEN")
+        self.app_key = app_key or os.getenv("DROPBOX_APP_KEY")
+        self.app_secret = app_secret or os.getenv("DROPBOX_APP_SECRET")
+
+        raw_root = (campaign_root or os.getenv("DROPBOX_CAMPAIGN_ROOT", "")).strip().replace("\\", "/")
+        if raw_root in ("", "/"):
+            self.campaign_root = ""  # App folder root
+        else:
+            self.campaign_root = "/" + raw_root.strip("/")
+
         self.cache_dir = Path(cache_dir or os.getenv("LOCAL_ASSET_CACHE_DIR", "./.cache/dropbox-assets")).resolve()
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         self._client: Optional[dropbox.Dropbox] = None
-        if self.access_token:
+
+        # Priority 1: Automatic token refresh using refresh token + app credentials
+        if self.refresh_token and self.app_key and self.app_secret:
+            self._client = dropbox.Dropbox(
+                oauth2_refresh_token=self.refresh_token,
+                app_key=self.app_key,
+                app_secret=self.app_secret,
+            )
+        # Priority 2: Direct short-lived access token
+        elif self.access_token:
             self._client = dropbox.Dropbox(self.access_token)
 
     def _get_client(self) -> dropbox.Dropbox:
         if not self._client:
-            raise StorageAuthError("DROPBOX_ACCESS_TOKEN is not configured in server environment.")
+            raise StorageAuthError(
+                "Dropbox credentials not configured. Provide DROPBOX_ACCESS_TOKEN or "
+                "(DROPBOX_REFRESH_TOKEN + DROPBOX_APP_KEY + DROPBOX_APP_SECRET)."
+            )
         return self._client
 
     def normalize_path(self, rel_path: str) -> str:
         """
         Normalize path to be strictly within the DROPBOX_CAMPAIGN_ROOT.
-        Returns a clean leading-slash path like '/yeti-ad-generator/campaigns/...'.
+        Handles both App Folder root ('/') and full Dropbox paths.
         """
         cleaned = rel_path.strip().replace("\\", "/").strip("/")
         if not cleaned:
-            return self.campaign_root
+            return self.campaign_root if self.campaign_root else ""
 
         root_clean = self.campaign_root.strip("/")
-        if cleaned.startswith(root_clean):
+        if root_clean and cleaned.startswith(root_clean):
+            return f"/{cleaned}"
+
+        if not self.campaign_root:
             return f"/{cleaned}"
 
         return f"{self.campaign_root}/{cleaned}"
@@ -257,13 +284,14 @@ class DropboxStorageAdapter(StorageAdapter):
             return None
 
     def get_status(self) -> StorageStatus:
-        if not self.access_token:
+        is_configured = bool(self.access_token or (self.refresh_token and self.app_key and self.app_secret))
+        if not is_configured:
             return StorageStatus(
                 configured=False,
                 reachable=False,
                 mode="dropbox",
-                root=self.campaign_root,
-                error="DROPBOX_ACCESS_TOKEN is not configured.",
+                root=self.campaign_root or "/",
+                error="Dropbox credentials not configured.",
             )
 
         try:

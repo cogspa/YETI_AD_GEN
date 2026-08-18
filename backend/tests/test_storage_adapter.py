@@ -187,3 +187,22 @@ def test_storage_factory():
 
         forced_local = get_storage_adapter(force_local=True)
         assert isinstance(forced_local, LocalStorageAdapter)
+
+
+@patch("dropbox.Dropbox")
+def test_storage_factory_with_refresh_token(mock_dbx_class):
+    """Verify factory initializes Dropbox client with oauth2_refresh_token."""
+    env_vars = {
+        "DROPBOX_ACCESS_TOKEN": "",
+        "DROPBOX_REFRESH_TOKEN": "mock_refresh_token_xyz",
+        "DROPBOX_APP_KEY": "mock_app_key_123",
+        "DROPBOX_APP_SECRET": "mock_app_secret_456",
+    }
+    with patch.dict(os.environ, env_vars):
+        adapter = get_storage_adapter()
+        assert isinstance(adapter, DropboxStorageAdapter)
+        mock_dbx_class.assert_called_with(
+            oauth2_refresh_token="mock_refresh_token_xyz",
+            app_key="mock_app_key_123",
+            app_secret="mock_app_secret_456",
+        )
