@@ -65,6 +65,18 @@ DEFAULT_ROLE_CONFIG: Dict[str, Dict[str, str]] = {
         "category": "Brand & Typography",
         "is_blocking": True,
     },
+    "brand_logo_black": {
+        "logical_id": "brand-logo-black",
+        "relative_path": "assets/brand/Yeti_Logo_1.png",
+        "category": "Brand & Typography",
+        "is_blocking": True,
+    },
+    "brand_logo_white": {
+        "logical_id": "brand-logo-white",
+        "relative_path": "assets/brand/Yeti_Logo_4.png",
+        "category": "Brand & Typography",
+        "is_blocking": True,
+    },
     "font_regular": {
         "logical_id": "font-regular",
         "relative_path": "assets/fonts/DejaVuSans.ttf",
@@ -291,6 +303,17 @@ class AssetResolver:
             is_blocking=is_blocking,
             error_message=f"Asset not found at local or Dropbox locations ('{rel_path}').",
         )
+
+    def resolve_logo_for_activity(self, activity: str) -> ResolvedAssetInfo:
+        """
+        Resolve white logo for camping/mountain/tailgate and black/navy logo for beach.
+        """
+        norm_activity = activity.lower().strip()
+        if norm_activity == "beach":
+            return self.resolve_role("brand_logo_black")
+        else:
+            # Camping, mountain, tailgating use white logo
+            return self.resolve_role("brand_logo_white")
 
     def generate_readiness_report(
         self,

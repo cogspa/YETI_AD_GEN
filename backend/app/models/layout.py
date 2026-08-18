@@ -135,16 +135,16 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
         product_region=NormalizedRegion(
             x=0.50,
             y=0.48,
-            max_width_pct=0.76,
-            max_height_pct=0.50,
+            max_width_pct=0.684,  # Decreased by 10% (0.76 -> 0.684)
+            max_height_pct=0.45,   # Decreased by 10% (0.50 -> 0.45)
             anchor_x="center",
             anchor_y="center",
         ),
         tagline_region=NormalizedRegion(
             x=0.50,
             y=0.88,
-            max_width_pct=0.86,
-            max_height_pct=0.16,
+            max_width_pct=0.834,  # Decreased by 3% (0.86 -> 0.834)
+            max_height_pct=0.155,  # Decreased by 3% (0.16 -> 0.155)
             anchor_x="center",
             anchor_y="bottom",
         ),
