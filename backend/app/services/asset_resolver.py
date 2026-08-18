@@ -306,14 +306,9 @@ class AssetResolver:
 
     def resolve_logo_for_activity(self, activity: str) -> ResolvedAssetInfo:
         """
-        Resolve white logo for camping/mountain/tailgate and black/navy logo for beach.
+        Resolve white YETI logo across all campaign activities (beach, camping, tailgating).
         """
-        norm_activity = activity.lower().strip()
-        if norm_activity == "beach":
-            return self.resolve_role("brand_logo_black")
-        else:
-            # Camping, mountain, tailgating use white logo
-            return self.resolve_role("brand_logo_white")
+        return self.resolve_role("brand_logo_white")
 
     def generate_readiness_report(
         self,

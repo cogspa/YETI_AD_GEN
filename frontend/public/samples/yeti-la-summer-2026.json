@@ -58,7 +58,7 @@
       "allowedBackgroundPoolIds": [
         "beach-west-coast"
       ],
-      "logoAssetId": "brand-logo-black",
+      "logoAssetId": "brand-logo-white",
       "taglineAssetId": "tagline-overlay-black",
       "taglinePoolId": "beach-taglines",
       "taglineTextColor": "#000000",

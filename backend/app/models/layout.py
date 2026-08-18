@@ -108,9 +108,9 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
         ),
         tagline_region=NormalizedRegion(
             x=0.50,
-            y=0.88,
-            max_width_pct=0.684,   # Decreased by 5% (0.72 -> 0.684)
-            max_height_pct=0.19,    # Decreased by 5% (0.20 -> 0.19)
+            y=0.90,  # Lowered by 10 points (~0.02 of 1080 canvas)
+            max_width_pct=0.684,
+            max_height_pct=0.19,
             anchor_x="center",
             anchor_y="bottom",
         ),
