@@ -10,92 +10,90 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({ ad, onClose }) => 
   if (!ad) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in" onClick={onClose}>
+    <div className="modal-overlay-bg" onClick={onClose}>
       <div
-        className="bg-[#0D151E] border border-[#1E2D3D] rounded-xl max-w-4xl w-full p-6 shadow-2xl relative overflow-hidden flex flex-col md:flex-row gap-6 max-h-[90vh]"
+        className="modal-dialog-box"
+        style={{ maxWidth: '960px', padding: '24px', display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white bg-[#15222E] hover:bg-[#1E2D3D] rounded-full w-8 h-8 flex items-center justify-center font-bold z-10"
+          className="modal-close-btn"
+          style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 10 }}
         >
           ✕
         </button>
 
         {/* Image Preview Container */}
-        <div className="flex-1 flex items-center justify-center bg-[#070B0F] rounded-lg p-3 border border-[#15222E] overflow-hidden min-h-[300px]">
+        <div style={{ flex: '1 1 400px', backgroundColor: '#05090E', borderRadius: '8px', border: '1px solid #14202C', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '340px' }}>
           <img
             src={ad.preview_url}
             alt={ad.filename}
-            className="max-h-[70vh] max-w-full object-contain rounded drop-shadow-2xl"
+            style={{ maxHeight: '65vh', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px', boxShadow: '0 8px 30px rgba(0, 0, 0, 0.8)' }}
           />
         </div>
 
         {/* Ad Details & Download Sidebar */}
-        <div className="w-full md:w-80 flex flex-col justify-between space-y-4">
+        <div style={{ flex: '0 0 300px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '16px' }}>
           <div>
-            <div className="flex items-center space-x-2 mb-2">
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-[#00D2FF]/20 text-[#00D2FF] border border-[#00D2FF]/40">
-                {ad.audience_id}
-              </span>
-              <span className="text-xs font-mono text-gray-400">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span className="badge-run-id">{ad.audience_id}</span>
+              <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#7E93A7' }}>
                 {ad.aspect_ratio} ({ad.dimensions[0]}×{ad.dimensions[1]})
               </span>
             </div>
 
-            <h3 className="text-lg font-bold text-white mb-1">{ad.audience_name}</h3>
-            <p className="text-xs text-gray-400 font-mono mb-4">{ad.filename}</p>
+            <h3 style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '800', marginBottom: '4px' }}>{ad.audience_name}</h3>
+            <p style={{ fontSize: '11px', color: '#5E7387', fontFamily: 'var(--font-mono)', marginBottom: '16px' }}>{ad.filename}</p>
 
-            <div className="space-y-2 text-xs font-mono text-gray-300 bg-[#121B24] p-3 rounded-lg border border-[#1C2A38]">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Activity:</span>
-                <span className="capitalize text-[#00D2FF]">{ad.activity}</span>
+            <div style={{ backgroundColor: '#0E1721', border: '1px solid #1C2B3A', borderRadius: '8px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#CAD6E2' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#5E7387' }}>Activity:</span>
+                <span style={{ color: '#00D2FF', textTransform: 'capitalize' }}>{ad.activity}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Territory:</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#5E7387' }}>Territory:</span>
                 <span>{ad.territory}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Age Band:</span>
-                <span className="uppercase">{ad.age_band}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#5E7387' }}>Age Band:</span>
+                <span style={{ textTransform: 'uppercase' }}>{ad.age_band}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Product:</span>
-                <span className="capitalize">{ad.product_color} Cooler</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#5E7387' }}>Product:</span>
+                <span style={{ textTransform: 'capitalize' }}>{ad.product_color} Cooler</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">File Size:</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#5E7387' }}>File Size:</span>
                 <span>{Math.round(ad.filesize_bytes / 1024)} KB</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Background:</span>
-                <span className={ad.background_source === 'approved_asset' ? 'text-emerald-400' : 'text-amber-400'}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#5E7387' }}>Background:</span>
+                <span style={{ color: ad.background_source === 'approved_asset' ? '#31C48D' : '#FDBA74' }}>
                   {ad.background_source === 'approved_asset' ? 'Approved Asset' : 'AI Generated'}
                 </span>
               </div>
             </div>
 
             {ad.human_review_required && (
-              <div className="mt-3 p-2.5 bg-amber-950/40 border border-amber-600/50 rounded-lg text-amber-300 text-xs font-mono">
+              <div style={{ marginTop: '12px', padding: '10px', backgroundColor: 'rgba(234, 88, 12, 0.15)', border: '1px solid #EA580C', borderRadius: '8px', color: '#FDBA74', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
                 ⚠️ <strong>Human Review Required:</strong> AI scene background variant.
               </div>
             )}
           </div>
 
-          <div className="space-y-2 pt-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '16px' }}>
             <a
               href={ad.preview_url}
               download={ad.filename}
-              className="w-full flex items-center justify-center space-x-2 py-2.5 rounded-lg bg-[#00D2FF] hover:bg-[#38bdf8] text-[#0A1118] font-bold text-sm transition-colors shadow-lg shadow-[#00D2FF]/20"
+              className="btn-zip-download"
+              style={{ justifyContent: 'center' }}
             >
               <span>📥 Download PNG</span>
             </a>
-            <button
-              onClick={onClose}
-              className="w-full py-2 rounded-lg bg-[#15222E] hover:bg-[#1E2D3D] text-gray-300 font-mono text-xs transition-colors"
-            >
-              Close
+            <button onClick={onClose} className="modal-close-btn" style={{ width: '100%', padding: '10px' }}>
+              Close Preview
             </button>
           </div>
         </div>

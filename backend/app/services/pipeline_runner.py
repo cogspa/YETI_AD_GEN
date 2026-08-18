@@ -255,25 +255,26 @@ class CampaignPipelineRunner:
 
         # Stage 11: Uploading to Dropbox / Storage
         emit_event("Uploading to Dropbox", 92, 18, "Uploading ads, contact sheet, and manifest to storage...")
-        storage_status = self.storage.get_status()
+        storage = get_storage_adapter()
+        storage_status = storage.get_status()
         dropbox_shared_link = None
         dropbox_folder = f"campaigns/{brief_model.campaign.id}/runs/{run_id}"
 
         try:
             # Upload manifest
-            self.storage.upload_json(
+            storage.upload_json(
                 manifest_data,
                 f"campaigns/{brief_model.campaign.id}/runs/{run_id}/generation-manifest.json",
                 overwrite=True,
             )
             # Update latest active campaign manifest pointer for repeat protection
-            self.storage.upload_json(
+            storage.upload_json(
                 manifest_data,
                 f"campaigns/{brief_model.campaign.id}/generation-manifest.json",
                 overwrite=True,
             )
             # Upload contact sheet
-            self.storage.upload(
+            storage.upload(
                 str(contact_sheet_local),
                 f"campaigns/{brief_model.campaign.id}/runs/{run_id}/contact-sheet.jpg",
                 overwrite=True,
@@ -281,14 +282,15 @@ class CampaignPipelineRunner:
             # Upload each ad
             for ad in ads:
                 if ad.storage_path:
-                    self.storage.upload(ad.local_path, ad.storage_path, overwrite=True)
+                    storage.upload(ad.local_path, ad.storage_path, overwrite=True)
 
             # Try retrieving folder link
-            dropbox_shared_link = self.storage.get_temporary_link(
+            dropbox_shared_link = storage.get_temporary_link(
                 f"campaigns/{brief_model.campaign.id}/runs/{run_id}/contact-sheet.jpg"
             )
         except Exception as e:
             plan_result.warnings.append(f"Remote storage upload warning: {str(e)}")
+
 
         duration = round(time.time() - start_time, 2)
         emit_event("Complete", 100, 18, f"Successfully generated all 18 ads in {duration}s!")

@@ -138,21 +138,22 @@ export const App: React.FC = () => {
 
   return (
     <main className="app-viewport">
-      <div className="app-column">
+      <div className={`app-column ${campaignResult ? 'results-mode' : ''}`}>
         {/* 1. Brand Header */}
         <Header />
 
         {/* 2. If results are active, show Campaign Results view */}
         {campaignResult ? (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center bg-[#070B0F] p-4 rounded-xl border border-[#182430]">
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-mono text-[#00D2FF]">VIEWING ACTIVE CAMPAIGN:</span>
-                <span className="text-xs font-mono font-bold text-white">{campaignResult.campaign_name}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#070C12', padding: '14px 20px', borderRadius: '10px', border: '1px solid #182533' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ color: '#00D2FF', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 'bold' }}>VIEWING ACTIVE CAMPAIGN:</span>
+                <span style={{ color: '#FFFFFF', fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold' }}>{campaignResult.campaign_name}</span>
               </div>
               <button
                 onClick={() => setCampaignResult(null)}
-                className="text-xs font-mono text-gray-400 hover:text-white px-3 py-1.5 rounded bg-[#15222E] hover:bg-[#1E2D3D]"
+                className="btn-contact-sheet-action"
+                style={{ padding: '6px 14px', fontSize: '11px' }}
               >
                 ← Back to Brief Config
               </button>

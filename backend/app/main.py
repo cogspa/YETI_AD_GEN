@@ -1,4 +1,8 @@
-"""FastAPI Backend Application for YETI Creative Automation."""
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env
+load_dotenv(override=True)
 
 from fastapi import FastAPI, Body, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +12,7 @@ from backend.app.models.brief import CampaignBriefModel
 from backend.app.models.assets import AssetReadinessReport
 from backend.app.services.brief_validator import validate_brief_dict
 from backend.app.services.asset_resolver import AssetResolver
+
 
 app = FastAPI(
     title="YETI Ad Generator API",
@@ -130,21 +135,16 @@ def generate_campaign_endpoint(
         raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
 
 
-@app.get("/api/outputs/{file_path:path}")
-def serve_output_file(file_path: str):
-    """Serves generated ads, contact sheets, and ZIP bundles with directory traversal protection."""
-    base = Path("outputs").resolve()
-    target = (base / file_path).resolve()
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
 
-    try:
-        target.relative_to(base)
-    except ValueError:
-        raise HTTPException(status_code=403, detail="Access denied")
+# Ensure outputs directory exists
+Path("outputs").mkdir(parents=True, exist_ok=True)
 
-    if not target.exists() or target.is_dir():
-        raise HTTPException(status_code=404, detail="File not found")
+# Mount static files to serve generated ads, contact sheets, and zip archives
+app.mount("/api/outputs", StaticFiles(directory="outputs", check_dir=False), name="outputs")
 
-    return FileResponse(path=str(target))
+
 
 
 if __name__ == "__main__":

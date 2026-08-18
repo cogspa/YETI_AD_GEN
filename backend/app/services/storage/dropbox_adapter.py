@@ -278,10 +278,22 @@ class DropboxStorageAdapter(StorageAdapter):
         client = self._get_client()
         norm_path = self.normalize_path(remote_path)
         try:
+            res = client.sharing_create_shared_link_with_settings(norm_path)
+            return res.url
+        except Exception:
+            try:
+                links = client.sharing_list_shared_links(path=norm_path, direct_only=True)
+                if links.links:
+                    return links.links[0].url
+            except Exception:
+                pass
+
+        try:
             link_res = client.files_get_temporary_link(norm_path)
             return link_res.link
         except Exception:
             return None
+
 
     def get_status(self) -> StorageStatus:
         is_configured = bool(self.access_token or (self.refresh_token and self.app_key and self.app_secret))

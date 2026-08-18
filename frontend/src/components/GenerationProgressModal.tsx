@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
 interface GenerationProgressModalProps {
   isOpen: boolean;
@@ -36,49 +36,43 @@ export const GenerationProgressModal: React.FC<GenerationProgressModalProps> = (
   const currentStageIndex = STAGES.indexOf(currentStage);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
-      <div className="bg-[#0D151E] border border-[#1E2D3D] rounded-xl max-w-lg w-full p-6 shadow-2xl relative overflow-hidden">
-        {/* Top decorative gradient bar */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#00D2FF] via-[#00A3FF] to-[#FF8A00]" />
-
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <span className="text-[#00D2FF] font-mono text-xl font-bold tracking-widest">YETI</span>
-            <span className="text-white font-semibold text-lg">Generating 18 Ads</span>
+    <div className="modal-overlay-bg">
+      <div className="modal-dialog-box" style={{ maxWidth: '540px', padding: '24px' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ color: '#00D2FF', fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '18px', letterSpacing: '0.1em' }}>YETI</span>
+            <span style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: '16px' }}>Generating 18 Ads</span>
           </div>
           {currentStage === 'Complete' && (
-            <span className="text-xs bg-[#00D2FF]/20 text-[#00D2FF] border border-[#00D2FF]/40 px-2 py-1 rounded font-mono">
-              READY
-            </span>
+            <span className="badge-count" style={{ fontSize: '11px' }}>READY</span>
           )}
         </div>
 
-        {/* Big Progress Counter */}
-        <div className="my-6 text-center">
-          <div className="text-4xl font-extrabold font-mono text-white tracking-wider mb-2">
-            {completedItems} <span className="text-gray-500 text-2xl font-normal">/ {totalItems}</span>
+        {/* Counter */}
+        <div style={{ textAlign: 'center', margin: '20px 0' }}>
+          <div style={{ fontSize: '36px', fontWeight: '800', fontFamily: 'var(--font-mono)', color: '#FFFFFF', letterSpacing: '0.05em' }}>
+            {completedItems} <span style={{ color: '#5E7387', fontSize: '22px' }}>/ {totalItems}</span>
           </div>
-          <p className="text-sm text-[#00D2FF] font-medium animate-pulse">
+          <p style={{ color: '#00D2FF', fontSize: '13px', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>
             {error ? 'Generation Encountered an Error' : currentStage}
           </p>
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full bg-[#15222E] rounded-full h-3 mb-6 overflow-hidden border border-[#1E2D3D]">
+        <div style={{ width: '100%', height: '10px', backgroundColor: '#111D29', borderRadius: '8px', border: '1px solid #1C2E40', overflow: 'hidden', marginBottom: '20px' }}>
           <div
-            className={`h-full transition-all duration-300 ${
-              error
-                ? 'bg-red-500'
-                : currentStage === 'Complete'
-                ? 'bg-gradient-to-r from-[#00D2FF] to-[#00FF88]'
-                : 'bg-gradient-to-r from-[#00A3FF] to-[#00D2FF]'
-            }`}
-            style={{ width: `${Math.max(5, Math.min(100, progressPct))}%` }}
+            style={{
+              height: '100%',
+              width: `${Math.max(5, Math.min(100, progressPct))}%`,
+              background: error ? '#E02424' : 'linear-gradient(90deg, #00A3FF, #00D2FF)',
+              transition: 'width 0.3s ease',
+            }}
           />
         </div>
 
         {/* Stage Steps List */}
-        <div className="space-y-2 mb-6 max-h-48 overflow-y-auto pr-1">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto', marginBottom: '20px' }}>
           {STAGES.map((stg, idx) => {
             const isDone = currentStageIndex > idx || currentStage === 'Complete';
             const isCurrent = currentStage === stg;
@@ -86,47 +80,51 @@ export const GenerationProgressModal: React.FC<GenerationProgressModalProps> = (
             return (
               <div
                 key={stg}
-                className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-mono transition-colors ${
-                  isCurrent
-                    ? 'bg-[#152535] text-[#00D2FF] border border-[#00D2FF]/40'
-                    : isDone
-                    ? 'bg-[#0E1A24] text-gray-300'
-                    : 'bg-[#0A1118] text-gray-600'
-                }`}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontFamily: 'var(--font-mono)',
+                  backgroundColor: isCurrent ? '#142433' : isDone ? '#0E1720' : '#070C12',
+                  color: isCurrent ? '#00D2FF' : isDone ? '#CAD6E2' : '#4E6375',
+                  border: isCurrent ? '1px solid rgba(0, 210, 255, 0.4)' : '1px solid transparent',
+                }}
               >
-                <div className="flex items-center space-x-2">
-                  <span className="w-4 text-center">
-                    {isDone ? '✓' : isCurrent ? '▶' : '○'}
-                  </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>{isDone ? '✓' : isCurrent ? '▶' : '○'}</span>
                   <span>{stg}</span>
                 </div>
                 {isCurrent && stg === 'Rendering 18 adaptations' && (
-                  <span className="text-[#FF8A00] font-bold">{completedItems}/18</span>
+                  <span style={{ color: '#FF8A00', fontWeight: 'bold' }}>{completedItems}/18</span>
                 )}
-                {isDone && <span className="text-gray-500">Done</span>}
+                {isDone && <span style={{ color: '#5E7387' }}>Done</span>}
               </div>
             );
           })}
         </div>
 
-        {/* Error message if present */}
+        {/* Error message */}
         {error && (
-          <div className="p-3 bg-red-950/50 border border-red-800 rounded-lg text-red-300 text-xs mb-4">
+          <div style={{ backgroundColor: 'rgba(224, 36, 36, 0.15)', border: '1px solid #E02424', color: '#FCA5A5', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', marginBottom: '16px', fontFamily: 'var(--font-mono)' }}>
             <strong>Error:</strong> {error}
           </div>
         )}
 
-        {/* Footer Actions */}
-        <div className="flex justify-end space-x-3">
-          {(currentStage === 'Complete' || error) && (
+        {/* Action button */}
+        {(currentStage === 'Complete' || error) && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
               onClick={onClose}
-              className="px-5 py-2 rounded-lg bg-[#00D2FF] hover:bg-[#38bdf8] text-[#0A1118] font-bold text-sm transition-colors shadow-lg shadow-[#00D2FF]/20"
+              className="btn-zip-download"
+              style={{ cursor: 'pointer', border: 'none' }}
             >
               {error ? 'Close' : 'View Generated Campaign'}
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
