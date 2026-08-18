@@ -9,7 +9,9 @@ import { GenerationProgressModal } from './components/GenerationProgressModal';
 import { CampaignResultsView } from './components/CampaignResultsView';
 import { LightboxModal } from './components/LightboxModal';
 import { ContactSheetModal } from './components/ContactSheetModal';
+import { QualityReportModal } from './components/QualityReportModal';
 import { YETI_GO_ANYWHERE_2026_BRIEF, SAMPLE_BRIEFS } from './data/sampleBriefs';
+
 import { validateBrief } from './utils/validation';
 import {
   generateCampaignAds,
@@ -37,6 +39,8 @@ export const App: React.FC = () => {
   const [campaignResult, setCampaignResult] = useState<CampaignRunResult | null>(null);
   const [selectedLightboxAd, setSelectedLightboxAd] = useState<GeneratedAdArtifact | null>(null);
   const [isContactSheetOpen, setIsContactSheetOpen] = useState<boolean>(false);
+  const [isQualityReportOpen, setIsQualityReportOpen] = useState<boolean>(false);
+
 
   const validation = useMemo(() => {
     return validateBrief(currentBrief);
@@ -163,6 +167,7 @@ export const App: React.FC = () => {
               result={campaignResult}
               onOpenLightbox={(ad) => setSelectedLightboxAd(ad)}
               onOpenContactSheet={() => setIsContactSheetOpen(true)}
+              onOpenQualityReport={() => setIsQualityReportOpen(true)}
               onReRun={handleGenerateClick}
             />
           </div>
@@ -223,9 +228,19 @@ export const App: React.FC = () => {
           runId={campaignResult?.run_id || 'active'}
           onClose={() => setIsContactSheetOpen(false)}
         />
+
+        {/* Quality Report Modal */}
+        <QualityReportModal
+          isOpen={isQualityReportOpen}
+          report={campaignResult?.quality_report || null}
+          reportUrl={campaignResult?.report_download_url}
+          logUrl={campaignResult?.pipeline_log_url}
+          onClose={() => setIsQualityReportOpen(false)}
+        />
       </div>
     </main>
   );
 };
+
 
 export default App;

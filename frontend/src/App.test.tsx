@@ -1,7 +1,11 @@
+// @vitest-environment jsdom
+import '@testing-library/jest-dom/vitest';
+
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { App } from './App';
 import * as api from './services/api';
+
 
 describe('YETI Ad Generator UI', () => {
   it('valid JSON reveals six audiences, three formats, and 18 outputs', () => {
@@ -71,7 +75,7 @@ describe('YETI Ad Generator UI', () => {
 
     render(<App />);
 
-    const generateBtn = screen.getByRole('button', { name: /GENERATE 18 ADS/i });
+    const generateBtn = screen.getAllByRole('button', { name: /GENERATE 18 ADS/i })[0];
     fireEvent.click(generateBtn);
 
     // Verify progress modal is opened
@@ -81,10 +85,11 @@ describe('YETI Ad Generator UI', () => {
   it('inspect / edit JSON panel expands and displays editable JSON', () => {
     render(<App />);
 
-    const toggleBtn = screen.getByRole('button', { name: /INSPECT \/ EDIT JSON/i });
+    const toggleBtn = screen.getAllByRole('button', { name: /INSPECT \/ EDIT JSON/i })[0];
     expect(toggleBtn).toBeInTheDocument();
 
     fireEvent.click(toggleBtn);
+
 
     const textarea = screen.getByLabelText(/Edit campaign JSON content/i) as HTMLTextAreaElement;
     expect(textarea).toBeInTheDocument();

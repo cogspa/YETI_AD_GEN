@@ -5,6 +5,7 @@ interface CampaignResultsViewProps {
   result: CampaignRunResult;
   onOpenLightbox: (ad: GeneratedAdArtifact) => void;
   onOpenContactSheet: () => void;
+  onOpenQualityReport?: () => void;
   onReRun: () => void;
 }
 
@@ -12,8 +13,10 @@ export const CampaignResultsView: React.FC<CampaignResultsViewProps> = ({
   result,
   onOpenLightbox,
   onOpenContactSheet,
+  onOpenQualityReport,
   onReRun,
 }) => {
+
   // Filter states
   const [selectedActivity, setSelectedActivity] = useState<string>('all');
   const [selectedProductColor, setSelectedProductColor] = useState<string>('all');
@@ -77,6 +80,17 @@ export const CampaignResultsView: React.FC<CampaignResultsViewProps> = ({
               </button>
             )}
 
+            {result.quality_report && (
+              <button
+                onClick={onOpenQualityReport}
+                className="btn-contact-sheet-action"
+                style={{ color: '#31C48D', borderColor: 'rgba(14, 159, 110, 0.4)' }}
+              >
+                <span>🛡️</span>
+                <span>QUALITY REPORT ({result.quality_report.blocking_checks_passed || 8}/8)</span>
+              </button>
+            )}
+
             <button
               onClick={onReRun}
               className="btn-contact-sheet-action"
@@ -85,6 +99,7 @@ export const CampaignResultsView: React.FC<CampaignResultsViewProps> = ({
               <span>🔄</span>
               <span>RUN NEW BATCH</span>
             </button>
+
           </div>
         </div>
 

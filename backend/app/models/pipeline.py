@@ -57,11 +57,14 @@ class CampaignRunResult(BaseModel):
     zip_bundle_local_path: Optional[str] = None
     zip_bundle_download_url: Optional[str] = None
     storage_mode: str  # "dropbox" or "local"
-    storage_root: str
     dropbox_folder_path: Optional[str] = None
     dropbox_shared_link: Optional[str] = None
+    quality_report: Optional[Dict[str, Any]] = None
+    report_download_url: Optional[str] = None
+    pipeline_log_url: Optional[str] = None
     provenance_summary: str
     gemini_used: bool = False
     gemini_audiences: List[str] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
     errors: List[str] = Field(default_factory=list)
+

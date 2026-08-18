@@ -102,15 +102,19 @@ export interface CampaignRunResult {
   zip_bundle_local_path?: string;
   zip_bundle_download_url?: string;
   storage_mode: string;
-  storage_root: string;
+  storage_root?: string;
   dropbox_folder_path?: string;
   dropbox_shared_link?: string;
+  quality_report?: any;
+  report_download_url?: string;
+  pipeline_log_url?: string;
   provenance_summary: string;
   gemini_used: boolean;
   gemini_audiences: string[];
   warnings: string[];
   errors: string[];
 }
+
 
 export async function fetchStorageStatus(): Promise<StorageStatus | null> {
   try {
