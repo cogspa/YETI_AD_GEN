@@ -219,7 +219,9 @@ def render_programmatic_text(
 
     curr_y = 0
     for idx, line in enumerate(lines):
-        draw.text((0, curr_y), line, font=best_font, fill=fill_color)
+        line_w = line_metrics[idx][0]
+        line_x = max(0, (img.width - line_w) // 2)
+        draw.text((line_x, curr_y), line, font=best_font, fill=fill_color)
         curr_y += line_metrics[idx][1] + line_spacing
 
     return img
