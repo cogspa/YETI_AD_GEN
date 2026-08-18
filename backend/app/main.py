@@ -39,6 +39,15 @@ def get_asset_readiness():
     return report
 
 
+from backend.app.services.storage import get_storage_adapter, StorageStatus
+
+@app.get("/api/storage/status", response_model=StorageStatus)
+def get_storage_status():
+    """Returns storage status (configured/reachable) without leaking secrets."""
+    adapter = get_storage_adapter()
+    return adapter.get_status()
+
+
 @app.post("/api/brief/validate")
 def validate_brief_endpoint(brief: Dict[str, Any] = Body(...)):
     """Validates campaign brief against strict contract."""

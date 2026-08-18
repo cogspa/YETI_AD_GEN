@@ -20,7 +20,7 @@ YETI_Sample_AD.psd
 *.pem
 *.key
 
-# Python
+# Python & Cache
 __pycache__/
 *.py[cod]
 *$py.class
@@ -30,6 +30,8 @@ env/
 venv/
 ENV/
 .venv/
+.cache/
+.dropbox_cache/
 
 # Outputs & temporary generation files
 outputs/*
