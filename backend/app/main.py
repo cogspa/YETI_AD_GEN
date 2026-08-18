@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI, Body, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from backend.app.models.brief import CampaignBriefModel
 from backend.app.models.assets import AssetReadinessReport
@@ -50,6 +50,32 @@ def validate_brief_endpoint(brief: Dict[str, Any] = Body(...)):
         "formatCount": len(model.outputFormats) if model else 0,
         "totalOutputs": model.generation.totalOutputsPerRun if model else 0,
     }
+
+
+from backend.app.models.plan import CampaignPlanResult
+from backend.app.services.concept_planner import ConceptPlanner
+
+planner = ConceptPlanner(resolver)
+
+
+@app.post("/api/campaign/plan", response_model=CampaignPlanResult)
+def plan_campaign_endpoint(
+    brief: Dict[str, Any] = Body(...),
+    seed: Optional[int] = None,
+):
+    """Plans 6 immutable audience concepts and 18 deterministic format render plans."""
+    is_valid, model, errors = validate_brief_dict(brief)
+    if not is_valid or model is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"message": "Invalid campaign brief", "errors": errors},
+        )
+
+    try:
+        plan_result = planner.plan_campaign(model, seed=seed)
+        return plan_result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

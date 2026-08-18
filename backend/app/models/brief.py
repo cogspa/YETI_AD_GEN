@@ -318,3 +318,8 @@ class CampaignBriefModel(BaseModel):
                 )
 
         return self
+
+
+# Alias for concise typing
+CampaignBrief = CampaignBriefModel
+
