@@ -29,8 +29,10 @@ export const YETI_GO_ANYWHERE_2026_BRIEF: CampaignBrief = {
       formats: "Render the selected concept once in every format listed in outputFormats."
     },
     repeatProtection: {
+      scope: "run-and-prior-manifest",
       avoidImmediateBackgroundRepeat: true,
-      avoidImmediateTaglineRepeat: true
+      avoidImmediateTaglineRepeat: true,
+      priorManifestPath: "outputs/yeti-la-go-anywhere-2026/generation-manifest.json"
     }
   },
   creativeRules: {

@@ -1,6 +1,7 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import { App } from './App';
+import * as api from './services/api';
 
 describe('YETI Ad Generator UI', () => {
   it('valid JSON reveals six audiences, three formats, and 18 outputs', () => {
@@ -42,10 +43,39 @@ describe('YETI Ad Generator UI', () => {
     const generateBtn = screen.getByRole('button', { name: /GENERATE 18 ADS/i });
     expect(generateBtn).toBeInTheDocument();
     expect(generateBtn).not.toBeDisabled();
+  });
 
-    // Click generate button and verify pipeline announcement
+  it('clicking GENERATE 18 ADS opens progress modal', async () => {
+    // Mock API call
+    vi.spyOn(api, 'generateCampaignAds').mockResolvedValueOnce({
+      run_id: 'run-test-001',
+      campaign_id: 'yeti-la-go-anywhere-2026',
+      campaign_name: 'Go Anywhere with YETI',
+      seed: 42,
+      status: 'success',
+      started_at: '2026-08-18T08:00:00Z',
+      completed_at: '2026-08-18T08:00:05Z',
+      duration_seconds: 4.2,
+      total_concepts: 6,
+      total_outputs: 18,
+      concepts: [],
+      ads: [],
+      storage_mode: 'dropbox',
+      storage_root: '/yeti-ad-generator',
+      provenance_summary: 'All backgrounds reused from approved assets.',
+      gemini_used: false,
+      gemini_audiences: [],
+      warnings: [],
+      errors: [],
+    });
+
+    render(<App />);
+
+    const generateBtn = screen.getByRole('button', { name: /GENERATE 18 ADS/i });
     fireEvent.click(generateBtn);
-    expect(screen.getByText(/UI ready — connect pipeline next/i)).toBeInTheDocument();
+
+    // Verify progress modal is opened
+    expect(screen.getByText('Generating 18 Ads')).toBeInTheDocument();
   });
 
   it('inspect / edit JSON panel expands and displays editable JSON', () => {

@@ -108,6 +108,45 @@ def generate_background_endpoint(req: GenerationRequest = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+from fastapi.responses import FileResponse
+from backend.app.models.pipeline import CampaignRunResult
+from backend.app.services.pipeline_runner import CampaignPipelineRunner
+
+runner = CampaignPipelineRunner()
+
+
+@app.post("/api/campaign/generate", response_model=CampaignRunResult)
+def generate_campaign_endpoint(
+    brief: Dict[str, Any] = Body(...),
+    seed: Optional[int] = None,
+):
+    """Executes end-to-end 18-ad campaign generation pipeline."""
+    try:
+        run_result = runner.execute_campaign(brief_dict=brief, seed=seed)
+        return run_result
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+
+
+@app.get("/api/outputs/{file_path:path}")
+def serve_output_file(file_path: str):
+    """Serves generated ads, contact sheets, and ZIP bundles with directory traversal protection."""
+    base = Path("outputs").resolve()
+    target = (base / file_path).resolve()
+
+    try:
+        target.relative_to(base)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not target.exists() or target.is_dir():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(path=str(target))
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)

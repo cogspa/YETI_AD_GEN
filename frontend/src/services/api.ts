@@ -37,19 +37,107 @@ export async function fetchAssetReadiness(): Promise<AssetReadinessReport | null
   }
 }
 
-export async function validateBriefWithBackend(briefData: any): Promise<BriefValidationResult | null> {
+export interface StorageStatus {
+  configured: boolean;
+  reachable: boolean;
+  mode: 'local' | 'dropbox';
+  root: string;
+  error?: string;
+}
+
+export interface GeneratedAdArtifact {
+  artifact_id: string;
+  concept_id: string;
+  audience_id: string;
+  audience_name: string;
+  activity: string;
+  territory: string;
+  age_band: string;
+  product_color: 'orange' | 'white';
+  aspect_ratio: '1:1' | '16:9' | '9:16';
+  dimensions: [number, number];
+  filename: string;
+  local_path: string;
+  preview_url: string;
+  storage_path?: string;
+  filesize_bytes: number;
+  background_source: string;
+  human_review_required: boolean;
+}
+
+export interface AudienceConcept {
+  concept_id: string;
+  audience_id: string;
+  audience_name: string;
+  age_band: 'younger' | 'older';
+  activity: string;
+  territory: string;
+  product_role: string;
+  product_asset_path: string;
+  background_pool_id: string;
+  selected_background_path: string;
+  tagline_pool_id: string;
+  selected_tagline_text: string;
+  selected_tagline_asset_path: string;
+  tagline_color_hex: string;
+  logo_asset_path: string;
+  seed_used: number;
+}
+
+export interface CampaignRunResult {
+  run_id: string;
+  campaign_id: string;
+  campaign_name: string;
+  seed: number;
+  status: 'success' | 'failed' | 'partial';
+  started_at: string;
+  completed_at: string;
+  duration_seconds: number;
+  total_concepts: number;
+  total_outputs: number;
+  concepts: AudienceConcept[];
+  ads: GeneratedAdArtifact[];
+  contact_sheet_local_path?: string;
+  contact_sheet_preview_url?: string;
+  zip_bundle_local_path?: string;
+  zip_bundle_download_url?: string;
+  storage_mode: string;
+  storage_root: string;
+  dropbox_folder_path?: string;
+  dropbox_shared_link?: string;
+  provenance_summary: string;
+  gemini_used: boolean;
+  gemini_audiences: string[];
+  warnings: string[];
+  errors: string[];
+}
+
+export async function fetchStorageStatus(): Promise<StorageStatus | null> {
   try {
-    const res = await fetch('/api/brief/validate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(briefData),
-    });
-    if (!res.ok) {
-      throw new Error(`Server error: HTTP ${res.status}`);
-    }
+    const res = await fetch('/api/storage/status');
+    if (!res.ok) return null;
     return await res.json();
   } catch (err) {
-    console.warn('Backend validation API unreachable, using client validator:', err);
     return null;
   }
 }
+
+export async function generateCampaignAds(
+  briefData: any,
+  seed?: number | null,
+): Promise<CampaignRunResult> {
+  const url = seed !== undefined && seed !== null ? `/api/campaign/generate?seed=${seed}` : '/api/campaign/generate';
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(briefData),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ detail: `HTTP ${res.status}: ${res.statusText}` }));
+    throw new Error(errorData.detail || errorData.message || `Generation failed (${res.status})`);
+  }
+
+  return await res.json();
+}
+

@@ -72,12 +72,15 @@ class RepeatProtection(BaseModel):
     scope: str = "run-and-prior-manifest"
     avoidImmediateBackgroundRepeat: bool = True
     avoidImmediateTaglineRepeat: bool = True
-    priorManifestPath: str
+    priorManifestPath: Optional[str] = "campaigns/yeti-la-go-anywhere-2026/generation-manifest.json"
 
     @field_validator("priorManifestPath")
     @classmethod
-    def check_manifest_path(cls, v: str) -> str:
+    def check_manifest_path(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
         return validate_portable_path(v, "repeatProtection.priorManifestPath")
+
 
 
 class GenerationSettings(BaseModel):

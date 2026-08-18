@@ -1,13 +1,22 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Header } from './components/Header';
 import { BriefUploadSection } from './components/BriefUploadSection';
 import { CampaignSummary } from './components/CampaignSummary';
 import { AssetReadiness } from './components/AssetReadiness';
 import { IntegrationStatus } from './components/IntegrationStatus';
 import { GenerateAction } from './components/GenerateAction';
+import { GenerationProgressModal } from './components/GenerationProgressModal';
+import { CampaignResultsView } from './components/CampaignResultsView';
+import { LightboxModal } from './components/LightboxModal';
+import { ContactSheetModal } from './components/ContactSheetModal';
 import { YETI_GO_ANYWHERE_2026_BRIEF, SAMPLE_BRIEFS } from './data/sampleBriefs';
 import { validateBrief } from './utils/validation';
-import type { CampaignBrief } from './types/campaign';
+import {
+  generateCampaignAds,
+  type CampaignBrief,
+  type CampaignRunResult,
+  type GeneratedAdArtifact,
+} from './services/api';
 
 export const App: React.FC = () => {
   const [currentBrief, setCurrentBrief] = useState<CampaignBrief>(YETI_GO_ANYWHERE_2026_BRIEF);
@@ -15,6 +24,19 @@ export const App: React.FC = () => {
   const [fileSizeBytes, setFileSizeBytes] = useState<number>(() => {
     return new Blob([JSON.stringify(YETI_GO_ANYWHERE_2026_BRIEF)]).size;
   });
+
+  // Generation State
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [showProgressModal, setShowProgressModal] = useState<boolean>(false);
+  const [currentStage, setCurrentStage] = useState<string>('Validating JSON');
+  const [progressPct, setProgressPct] = useState<number>(0);
+  const [completedItems, setCompletedItems] = useState<number>(0);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
+  // Results State
+  const [campaignResult, setCampaignResult] = useState<CampaignRunResult | null>(null);
+  const [selectedLightboxAd, setSelectedLightboxAd] = useState<GeneratedAdArtifact | null>(null);
+  const [isContactSheetOpen, setIsContactSheetOpen] = useState<boolean>(false);
 
   const validation = useMemo(() => {
     return validateBrief(currentBrief);
@@ -24,6 +46,8 @@ export const App: React.FC = () => {
     setCurrentBrief(newBrief);
     setCurrentFilename(filename);
     setFileSizeBytes(sizeBytes);
+    // Reset prior results when brief changes
+    setCampaignResult(null);
   };
 
   const handleReset = () => {
@@ -32,6 +56,84 @@ export const App: React.FC = () => {
     setCurrentBrief(defaultSample.brief);
     setCurrentFilename(defaultSample.filename);
     setFileSizeBytes(size);
+    setCampaignResult(null);
+  };
+
+  const handleGenerateClick = async () => {
+    if (!validation.isValid) return;
+
+    setIsGenerating(true);
+    setShowProgressModal(true);
+    setGenerationError(null);
+    setProgressPct(5);
+    setCurrentStage('Validating JSON');
+    setCompletedItems(0);
+
+    try {
+      // Simulate live progressive stage updates during API processing
+      const timer1 = setTimeout(() => {
+        setCurrentStage('Resolving controlled assets');
+        setProgressPct(18);
+      }, 300);
+
+      const timer2 = setTimeout(() => {
+        setCurrentStage('Reading repeat history');
+        setProgressPct(28);
+      }, 600);
+
+      const timer3 = setTimeout(() => {
+        setCurrentStage('Selecting six concepts');
+        setProgressPct(38);
+      }, 900);
+
+      const timer4 = setTimeout(() => {
+        setCurrentStage('Generating missing backgrounds if needed');
+        setProgressPct(48);
+      }, 1200);
+
+      const timer5 = setTimeout(() => {
+        setCurrentStage('Rendering 18 adaptations');
+        setProgressPct(60);
+        setCompletedItems(6);
+      }, 1600);
+
+      const timer6 = setTimeout(() => {
+        setCompletedItems(12);
+        setProgressPct(75);
+      }, 2100);
+
+      const timer7 = setTimeout(() => {
+        setCompletedItems(18);
+        setCurrentStage('Running checks');
+        setProgressPct(88);
+      }, 2600);
+
+      const timer8 = setTimeout(() => {
+        setCurrentStage('Uploading to Dropbox');
+        setProgressPct(94);
+      }, 3000);
+
+      // Call live backend endpoint
+      const result = await generateCampaignAds(currentBrief);
+
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+      clearTimeout(timer4);
+      clearTimeout(timer5);
+      clearTimeout(timer6);
+      clearTimeout(timer7);
+      clearTimeout(timer8);
+
+      setCurrentStage('Complete');
+      setProgressPct(100);
+      setCompletedItems(18);
+      setCampaignResult(result);
+    } catch (err: any) {
+      setGenerationError(err.message || 'Generation failed.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -40,29 +142,85 @@ export const App: React.FC = () => {
         {/* 1. Brand Header */}
         <Header />
 
-        {/* 2. Campaign Brief (JSON) */}
-        <BriefUploadSection
-          currentBrief={currentBrief}
-          currentFilename={currentFilename}
-          fileSizeBytes={fileSizeBytes}
-          validation={validation}
-          onBriefChange={handleBriefChange}
-          onReset={handleReset}
+        {/* 2. If results are active, show Campaign Results view */}
+        {campaignResult ? (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center bg-[#070B0F] p-4 rounded-xl border border-[#182430]">
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-mono text-[#00D2FF]">VIEWING ACTIVE CAMPAIGN:</span>
+                <span className="text-xs font-mono font-bold text-white">{campaignResult.campaign_name}</span>
+              </div>
+              <button
+                onClick={() => setCampaignResult(null)}
+                className="text-xs font-mono text-gray-400 hover:text-white px-3 py-1.5 rounded bg-[#15222E] hover:bg-[#1E2D3D]"
+              >
+                ← Back to Brief Config
+              </button>
+            </div>
+
+            <CampaignResultsView
+              result={campaignResult}
+              onOpenLightbox={(ad) => setSelectedLightboxAd(ad)}
+              onOpenContactSheet={() => setIsContactSheetOpen(true)}
+              onReRun={handleGenerateClick}
+            />
+          </div>
+        ) : (
+          /* Otherwise show Brief Configuration & Readiness view */
+          <div className="space-y-6">
+            {/* Campaign Brief (JSON) */}
+            <BriefUploadSection
+              currentBrief={currentBrief}
+              currentFilename={currentFilename}
+              fileSizeBytes={fileSizeBytes}
+              validation={validation}
+              onBriefChange={handleBriefChange}
+              onReset={handleReset}
+            />
+
+            {/* Campaign Summary (6 audiences × 3 formats = 18 outputs) */}
+            <CampaignSummary brief={currentBrief} />
+
+            {/* Asset Readiness */}
+            <AssetReadiness />
+
+            {/* Integration Status */}
+            <IntegrationStatus />
+
+            {/* Generate Action Button */}
+            <GenerateAction
+              isValid={validation.isValid}
+              totalOutputs={validation.totalOutputs}
+              isGenerating={isGenerating}
+              onGenerateClick={handleGenerateClick}
+            />
+          </div>
+        )}
+
+        {/* Live Generation Progress Modal */}
+        <GenerationProgressModal
+          isOpen={showProgressModal}
+          currentStage={currentStage}
+          progressPct={progressPct}
+          completedItems={completedItems}
+          totalItems={18}
+          error={generationError}
+          onClose={() => setShowProgressModal(false)}
         />
 
-        {/* 3. Campaign Summary (6 audiences × 3 formats = 18 outputs) */}
-        <CampaignSummary brief={currentBrief} />
+        {/* Lightbox Preview Modal */}
+        <LightboxModal
+          ad={selectedLightboxAd}
+          onClose={() => setSelectedLightboxAd(null)}
+        />
 
-        {/* 4. Asset Readiness */}
-        <AssetReadiness />
-
-        {/* 5. Integration Status */}
-        <IntegrationStatus />
-
-        {/* 6. Generate Action Button */}
-        <GenerateAction
-          isValid={validation.isValid}
-          totalOutputs={validation.totalOutputs}
+        {/* Contact Sheet Fullscreen Modal */}
+        <ContactSheetModal
+          isOpen={isContactSheetOpen}
+          contactSheetUrl={campaignResult?.contact_sheet_preview_url || null}
+          campaignName={campaignResult?.campaign_name || 'YETI Campaign'}
+          runId={campaignResult?.run_id || 'active'}
+          onClose={() => setIsContactSheetOpen(false)}
         />
       </div>
     </main>
