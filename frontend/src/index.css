@@ -651,9 +651,55 @@ body {
   color: var(--color-green);
 }
 
+.status-dropbox {
+  background-color: var(--color-blue-subtle);
+  color: var(--color-blue-primary);
+}
+
 .status-gemini-fallback-available {
   background-color: var(--color-purple-bg);
   color: var(--color-purple);
+}
+
+.status-blocking {
+  background-color: var(--color-red-bg);
+  color: var(--color-red);
+}
+
+.section-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.badge-readiness-summary {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-green);
+  background-color: var(--color-green-bg);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.asset-item-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+}
+
+.asset-item-dim {
+  font-size: 10px;
+  color: var(--color-text-subtle);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.asset-item-sha {
+  font-size: 9px;
+  color: var(--color-text-subtle);
+  font-family: var(--font-mono);
 }
 
 .status-dot {
