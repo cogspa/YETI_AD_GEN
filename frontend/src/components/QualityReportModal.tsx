@@ -4,6 +4,7 @@ interface QualityReportModalProps {
   isOpen: boolean;
   report: any;
   reportUrl?: string;
+  manifestUrl?: string;
   logUrl?: string;
   onClose: () => void;
 }
@@ -12,6 +13,7 @@ export const QualityReportModal: React.FC<QualityReportModalProps> = ({
   isOpen,
   report,
   reportUrl,
+  manifestUrl,
   logUrl,
   onClose,
 }) => {
@@ -42,11 +44,21 @@ export const QualityReportModal: React.FC<QualityReportModalProps> = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {manifestUrl && (
+              <a
+                href={manifestUrl}
+                download="generation-manifest.json"
+                className="btn-zip-download"
+                style={{ padding: '6px 12px', fontSize: '11px' }}
+              >
+                📋 Manifest JSON
+              </a>
+            )}
             {reportUrl && (
               <a
                 href={reportUrl}
                 download="generation-report.json"
-                className="btn-zip-download"
+                className="btn-contact-sheet-action"
                 style={{ padding: '6px 12px', fontSize: '11px' }}
               >
                 📥 Report JSON
@@ -67,6 +79,7 @@ export const QualityReportModal: React.FC<QualityReportModalProps> = ({
             </button>
           </div>
         </div>
+
 
         {/* Content Area */}
         <div className="modal-content-area" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

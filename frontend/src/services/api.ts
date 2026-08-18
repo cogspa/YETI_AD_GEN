@@ -108,7 +108,9 @@ export interface CampaignRunResult {
   dropbox_shared_link?: string;
   quality_report?: any;
   report_download_url?: string;
+  manifest_download_url?: string;
   pipeline_log_url?: string;
+
   provenance_summary: string;
   gemini_used: boolean;
   gemini_audiences: string[];

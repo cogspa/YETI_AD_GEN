@@ -61,7 +61,9 @@ class CampaignRunResult(BaseModel):
     dropbox_shared_link: Optional[str] = None
     quality_report: Optional[Dict[str, Any]] = None
     report_download_url: Optional[str] = None
+    manifest_download_url: Optional[str] = None
     pipeline_log_url: Optional[str] = None
+
     provenance_summary: str
     gemini_used: bool = False
     gemini_audiences: List[str] = Field(default_factory=list)

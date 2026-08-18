@@ -235,9 +235,11 @@ export const App: React.FC = () => {
           isOpen={isQualityReportOpen}
           report={campaignResult?.quality_report || null}
           reportUrl={campaignResult?.report_download_url}
+          manifestUrl={campaignResult?.manifest_download_url}
           logUrl={campaignResult?.pipeline_log_url}
           onClose={() => setIsQualityReportOpen(false)}
         />
+
       </div>
     </main>
   );

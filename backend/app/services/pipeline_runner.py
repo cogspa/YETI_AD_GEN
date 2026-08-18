@@ -349,6 +349,9 @@ class CampaignPipelineRunner:
         manifest_local = run_dir / "generation-manifest.json"
         with open(manifest_local, "w", encoding="utf-8") as f:
             json.dump(manifest_data, f, indent=2)
+        manifest_rel_path = str(manifest_local.relative_to(self.base_dir)).replace("\\", "/")
+        manifest_url = f"/api/outputs/{manifest_rel_path}"
+
 
         # Write Secret-safe JSONL pipeline log
         log_entry("Pipeline Execution", "INFO", f"Completed run {run_id} successfully.")
@@ -429,7 +432,9 @@ class CampaignPipelineRunner:
             dropbox_shared_link=dropbox_shared_link,
             quality_report=quality_report.model_dump(),
             report_download_url=report_url,
+            manifest_download_url=manifest_url,
             pipeline_log_url=log_url,
+
             provenance_summary=quality_report.provenance_summary,
             gemini_used=gemini_used,
             gemini_audiences=gemini_audiences,
