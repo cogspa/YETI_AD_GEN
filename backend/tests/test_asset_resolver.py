@@ -26,12 +26,8 @@ def test_local_resolution_all_canonical_assets(resolver):
         assert info.sha256_hash is not None
         assert len(info.sha256_hash) == 64
 
-        if role == "product_orange":
-            assert info.has_alpha is True, "Product orange must have alpha transparency channel."
-            assert info.dimensions is not None
-            assert info.dimensions[0] > 0 and info.dimensions[1] > 0
-
-        if role == "product_white":
+        if role in ("product_orange", "product_white"):
+            assert info.has_alpha is True, f"Product {role} must have alpha transparency channel."
             assert info.format_type == "PNG"
             assert info.dimensions is not None
             assert info.dimensions[0] > 0 and info.dimensions[1] > 0
