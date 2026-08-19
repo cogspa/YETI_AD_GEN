@@ -59,8 +59,8 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
         logo_region=NormalizedRegion(
             x=0.50,
             y=0.085,
-            max_width_pct=0.336,  # Increased by 20% (0.28 -> 0.336)
-            max_height_pct=0.12,   # Increased by 20% (0.10 -> 0.12)
+            max_width_pct=0.437,  # Increased by 30% (0.336 -> 0.437)
+            max_height_pct=0.156,  # Increased by 30% (0.120 -> 0.156)
             anchor_x="center",
             anchor_y="top",
         ),
@@ -74,7 +74,7 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
         ),
         tagline_region=NormalizedRegion(
             x=0.50,
-            y=(1080 - 55) / 1080,  # Raised by 25px (from 30px to 55px from bottom edge)
+            y=(1080 - 65) / 1080,  # Raised by 10px more (65px from bottom edge)
             max_width_pct=0.84,
             max_height_pct=0.18,
             anchor_x="center",
@@ -93,8 +93,8 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
         logo_region=NormalizedRegion(
             x=0.50,
             y=0.085,
-            max_width_pct=0.216,  # Increased by 20% (0.18 -> 0.216)
-            max_height_pct=0.12,   # Increased by 20% (0.10 -> 0.12)
+            max_width_pct=0.281,  # Increased by 30% (0.216 -> 0.281)
+            max_height_pct=0.156,  # Increased by 30% (0.120 -> 0.156)
             anchor_x="center",
             anchor_y="top",
         ),
@@ -108,7 +108,7 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
         ),
         tagline_region=NormalizedRegion(
             x=0.50,
-            y=(1080 - 55) / 1080,  # Raised by 25px (from 30px to 55px from bottom edge)
+            y=(1080 - 65) / 1080,  # Raised by 10px more (65px from bottom edge)
             max_width_pct=0.684,
             max_height_pct=0.19,
             anchor_x="center",
@@ -127,8 +127,8 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
         logo_region=NormalizedRegion(
             x=0.50,
             y=0.085,
-            max_width_pct=0.36,   # Increased by 20% (0.30 -> 0.36)
-            max_height_pct=0.096,  # Increased by 20% (0.08 -> 0.096)
+            max_width_pct=0.468,  # Increased by 30% (0.360 -> 0.468)
+            max_height_pct=0.125,  # Increased by 30% (0.096 -> 0.125)
             anchor_x="center",
             anchor_y="top",
         ),
@@ -152,4 +152,5 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
         shadow=ShadowConfig(enabled=True, opacity=0.32, blur_radius=22, offset_y_pct=0.015),
     ),
 }
+
 
