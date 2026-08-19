@@ -294,6 +294,41 @@ class DropboxStorageAdapter(StorageAdapter):
         except Exception:
             return None
 
+    def get_shared_folder_link(self, remote_folder_path: str) -> Optional[str]:
+        """
+        Generate a web URL for viewing the folder directly in Dropbox (dl=0).
+        Never triggers raw file downloads.
+        """
+        try:
+            client = self._get_client()
+            norm_path = self.normalize_path(remote_folder_path)
+
+            try:
+                res = client.sharing_create_shared_link_with_settings(norm_path)
+                if res.url:
+                    url = res.url.replace("dl=1", "dl=0")
+                    return url
+            except Exception:
+                try:
+                    links = client.sharing_list_shared_links(path=norm_path, direct_only=True)
+                    if links.links:
+                        url = links.links[0].url.replace("dl=1", "dl=0")
+                        return url
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Fallback to direct Dropbox web app folder URL
+        clean_sub = remote_folder_path.strip("/")
+        root_clean = (self.campaign_root or "").strip("/")
+        if root_clean and not clean_sub.startswith(root_clean):
+            full_sub = f"{root_clean}/{clean_sub}"
+        else:
+            full_sub = clean_sub
+        return f"https://www.dropbox.com/home/Apps/{full_sub}"
+
+
 
     def get_status(self) -> StorageStatus:
         is_configured = bool(self.access_token or (self.refresh_token and self.app_key and self.app_secret))

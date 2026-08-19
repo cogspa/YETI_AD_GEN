@@ -98,6 +98,12 @@ class StorageAdapter(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def get_shared_folder_link(self, remote_folder_path: str) -> Optional[str]:
+        """Generate web browser link to view the storage folder."""
+        pass
+
+    @abc.abstractmethod
     def get_status(self) -> StorageStatus:
         """Return provider readiness and reachability status without exposing secrets."""
         pass
+

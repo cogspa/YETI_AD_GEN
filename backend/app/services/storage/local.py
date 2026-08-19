@@ -143,6 +143,12 @@ class LocalStorageAdapter(StorageAdapter):
             return None
         return f"file://{target}"
 
+    def get_shared_folder_link(self, remote_folder_path: str) -> Optional[str]:
+        """Return web view URL for local folder."""
+        clean = remote_folder_path.strip("/")
+        return f"/api/outputs/{clean}"
+
+
     def get_status(self) -> StorageStatus:
         return StorageStatus(
             configured=True,

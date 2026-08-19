@@ -401,12 +401,11 @@ class CampaignPipelineRunner:
             with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
                 list(executor.map(_upload_file_task, upload_tasks))
 
-            # Retrieve folder or contact-sheet share link
-            dropbox_shared_link = storage.get_temporary_link(
-                f"campaigns/{brief_model.campaign.id}/runs/{run_id}/contact-sheet.jpg"
-            )
+            # Retrieve folder web link (dl=0) for viewing backups in Dropbox Web
+            dropbox_shared_link = storage.get_shared_folder_link(dropbox_folder)
         except Exception as e:
             plan_result.warnings.append(f"Remote storage upload warning: {str(e)}")
+
 
         duration = round(time.time() - start_time, 2)
         emit_event("Complete", 100, completed_ads, f"Successfully generated all {total_ads} ads in {duration}s!", total=total_ads)

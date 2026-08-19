@@ -26,6 +26,7 @@ const DEFAULT_FALLBACK_ITEMS: AssetDisplayItem[] = [
 
 export const AssetReadiness: React.FC = () => {
   const [report, setReport] = useState<AssetReadinessReport | null>(null);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -107,40 +108,60 @@ export const AssetReadiness: React.FC = () => {
 
   return (
     <section className="asset-readiness-section" aria-labelledby="assets-heading">
-      <div className="section-header-row">
-        <div className="section-header-label" id="assets-heading">
-          ASSET READINESS &amp; RESOLVER REPORT
+      <div
+        className="section-header-row"
+        style={{ cursor: 'pointer', userSelect: 'none', marginBottom: isExpanded ? '14px' : '0px' }}
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="section-header-label" id="assets-heading" style={{ marginBottom: 0 }}>
+            ASSET READINESS &amp; RESOLVER REPORT
+          </div>
+          {report && (
+            <span className="badge-readiness-summary">
+              {report.is_ready_to_generate ? '✓ All Assets Ready' : `⚠️ ${report.blocking_missing_count} Blocking Missing`}
+            </span>
+          )}
         </div>
-        {report && (
-          <span className="badge-readiness-summary">
-            {report.is_ready_to_generate ? '✓ All Assets Ready' : `⚠️ ${report.blocking_missing_count} Blocking Missing`}
-          </span>
-        )}
+
+        <button
+          type="button"
+          className="btn-toggle-json"
+          style={{ padding: '4px 12px', fontSize: '11px', backgroundColor: '#0B131B', border: '1px solid #1C2D3D', borderRadius: '4px', color: '#00D2FF', cursor: 'pointer' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsExpanded(!isExpanded);
+          }}
+        >
+          {isExpanded ? '▲ Collapse' : '▼ Expand'}
+        </button>
       </div>
 
-      <div className="asset-checklist-panel">
-        <div className="asset-grid">
-          {displayItems.map((item, idx) => (
-            <div key={idx} className="asset-item-card">
-              <div className="asset-item-header">
-                <span className="asset-category-pill">{item.category}</span>
-                <span className={`asset-status-pill ${getStatusClass(item.status)}`}>
-                  <span className="status-dot" />
-                  {getStatusLabel(item.status)}
-                </span>
+      {isExpanded && (
+        <div className="asset-checklist-panel">
+          <div className="asset-grid">
+            {displayItems.map((item, idx) => (
+              <div key={idx} className="asset-item-card">
+                <div className="asset-item-header">
+                  <span className="asset-category-pill">{item.category}</span>
+                  <span className={`asset-status-pill ${getStatusClass(item.status)}`}>
+                    <span className="status-dot" />
+                    {getStatusLabel(item.status)}
+                  </span>
+                </div>
+                <div className="asset-item-name">{item.name}</div>
+                <div className="asset-item-meta-row">
+                  <span className="asset-item-path" title={item.location}>{item.location}</span>
+                  {item.dimensions && <span className="asset-item-dim">{item.dimensions}</span>}
+                </div>
+                {item.sha256Prefix && (
+                  <div className="asset-item-sha">SHA: {item.sha256Prefix}…</div>
+                )}
               </div>
-              <div className="asset-item-name">{item.name}</div>
-              <div className="asset-item-meta-row">
-                <span className="asset-item-path" title={item.location}>{item.location}</span>
-                {item.dimensions && <span className="asset-item-dim">{item.dimensions}</span>}
-              </div>
-              {item.sha256Prefix && (
-                <div className="asset-item-sha">SHA: {item.sha256Prefix}…</div>
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </section>
   );
 };

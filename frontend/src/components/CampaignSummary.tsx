@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { CampaignBrief } from '../types/campaign';
 
 interface CampaignSummaryProps {
@@ -6,6 +6,7 @@ interface CampaignSummaryProps {
 }
 
 export const CampaignSummary: React.FC<CampaignSummaryProps> = ({ brief }) => {
+  const [isExpanded, setIsExpanded] = useState<boolean>(true);
   const audiences = brief.audiences || [];
   const formats = brief.outputFormats || [];
   const conceptsPerAudience = brief.generation?.conceptsPerAudience || 1;
@@ -13,11 +14,37 @@ export const CampaignSummary: React.FC<CampaignSummaryProps> = ({ brief }) => {
 
   return (
     <section className="campaign-summary-section" aria-labelledby="summary-heading">
-      <div className="section-header-label" id="summary-heading">
-        CAMPAIGN MATRIX &amp; AUDIENCE SEGMENTS
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          cursor: 'pointer',
+          userSelect: 'none',
+          marginBottom: isExpanded ? '12px' : '0px',
+        }}
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="section-header-label" id="summary-heading" style={{ marginBottom: 0 }}>
+          TARGET AUDIENCES &amp; CREATIVE MATRIX
+        </div>
+        <button
+          type="button"
+          className="btn-toggle-json"
+          style={{ padding: '4px 12px', fontSize: '11px', backgroundColor: '#0B131B', border: '1px solid #1C2D3D', borderRadius: '4px', color: '#00D2FF', cursor: 'pointer' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsExpanded(!isExpanded);
+          }}
+        >
+          {isExpanded ? '▲ Collapse' : '▼ Expand'}
+        </button>
       </div>
 
-      <div className="summary-banner">
+      {isExpanded && (
+        <>
+          <div className="summary-banner">
+
         <div className="summary-formula-box">
           <div className="summary-formula-main">
             <span className="formula-part highlight">{audiences.length} audiences</span>
@@ -89,11 +116,20 @@ export const CampaignSummary: React.FC<CampaignSummaryProps> = ({ brief }) => {
                     </span>
                   </span>
                 </div>
+                <div className="detail-row">
+                  <span className="detail-key">Outputs:</span>
+                  <span className="detail-val" style={{ color: '#00D2FF', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
+                    {conceptsPerAudience * formats.length} ads {conceptsPerAudience > 1 ? `(${conceptsPerAudience} vars × ${formats.length} formats)` : `(${formats.map((f: any) => f.aspectRatio).join(', ')})`}
+                  </span>
+                </div>
               </div>
             </div>
           );
         })}
       </div>
+        </>
+      )}
     </section>
   );
 };
+
