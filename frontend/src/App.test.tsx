@@ -14,10 +14,11 @@ describe('YETI Ad Generator UI', () => {
     // Check header
     expect(screen.getByText('AD GENERATOR')).toBeInTheDocument();
 
-    // Check formula / summary banner: "6 audiences × 3 formats = 18 outputs"
+    // Check formula / summary banner: "6 audiences × 3 formats = 18 Target Ads"
     expect(screen.getByText(/6 audiences/i)).toBeInTheDocument();
     expect(screen.getByText(/3 formats/i)).toBeInTheDocument();
-    expect(screen.getByText(/18 outputs/i)).toBeInTheDocument();
+    expect(screen.getByText(/18 Target Ads/i)).toBeInTheDocument();
+
 
     // Check 3 target formats
     expect(screen.getByText('1:1')).toBeInTheDocument();

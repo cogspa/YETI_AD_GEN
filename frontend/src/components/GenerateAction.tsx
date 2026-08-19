@@ -26,10 +26,11 @@ export const GenerateAction: React.FC<GenerateActionProps> = ({
           {isGenerating ? 'GENERATING ADS...' : 'GENERATE ADS'}
         </span>
         <span id="generate-subtext" className="btn-generate-sub">
-          Deterministic multi-format adaptation ({totalOutputs} total outputs)
+          Deterministic multi-format adaptation across target aspect ratios
         </span>
       </button>
     </section>
+
 
 
   );

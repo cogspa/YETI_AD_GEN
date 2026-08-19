@@ -57,12 +57,13 @@ export const CampaignSummary: React.FC<CampaignSummaryProps> = ({ brief }) => {
             <span className="formula-operator">×</span>
             <span className="formula-part highlight">{formats.length} formats</span>
             <span className="formula-operator">=</span>
-            <span className="formula-total">{totalOutputs} outputs</span>
+            <span className="formula-total">{totalOutputs} Target Ads</span>
           </div>
           <div className="summary-formula-note">
-            Fixed deterministic workflow • {conceptsPerAudience} concept{conceptsPerAudience > 1 ? 's' : ''} per audience adapted across all {formats.length} aspect ratios
+            Configured Campaign Matrix • {conceptsPerAudience} concept{conceptsPerAudience > 1 ? 's' : ''} per audience mapped across all {formats.length} aspect ratios
           </div>
         </div>
+
 
 
         {/* Aspect Ratio Formats Pills */}
