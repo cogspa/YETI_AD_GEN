@@ -1,0 +1,497 @@
+{
+  "schemaVersion": "1.0.0",
+  "campaign": {
+    "id": "yeti-la-go-anywhere-2026",
+    "name": "Go Anywhere with YETI (72-Ad Multi-Audience Campaign)",
+    "market": "Los Angeles, California",
+    "ageRange": {
+      "minimum": 20,
+      "maximum": 30
+    },
+    "objective": "Generate 72 randomized, locally relevant YETI ads across 12 distinct Los Angeles audience demographics, including new outdoor activity segments powered by Google Gemini AI scene generation.",
+    "campaignLine": "Go Anywhere with YETI"
+  },
+  "generation": {
+    "mode": "seeded-random",
+    "seed": null,
+    "conceptsPerAudience": 2,
+    "totalAudienceGroups": 12,
+    "adsPerAudience": 6,
+    "totalOutputsPerRun": 72,
+    "randomizeOncePerAudience": false,
+    "renderAllFormatsFromSameConcept": true,
+    "selectionRules": {
+      "background": "Randomly select one background from the audience's assigned backgroundPoolId, or generate with Gemini AI if no local asset exists.",
+      "tagline": "Randomly select one tagline from the audience's assigned taglinePoolId.",
+      "taglineColor": "Use black tagline (#000000) for beach/surfing activities. Use white tagline (#FFFFFF) for camping, tailgating, hiking, fishing, and climbing activities.",
+      "productColor": "Use orange cooler when audience age maximum is 24 or younger. Use white cooler when audience age minimum is 25 or older.",
+      "formats": "Render each selected concept in all 3 formats listed in outputFormats."
+    },
+    "repeatProtection": {
+      "scope": "run-and-prior-manifest",
+      "avoidImmediateBackgroundRepeat": true,
+      "avoidImmediateTaglineRepeat": true,
+      "priorManifestPath": "outputs/yeti-la-go-anywhere-2026/generation-manifest.json"
+    }
+  },
+  "assetCatalog": {
+    "product-cooler-orange": "assets/products/cooler_orange.png",
+    "product-cooler-white": "assets/products/cooler_white.png",
+    "bg-tailgate": "assets/backgrounds/Tailgate.jpg",
+    "bg-beach": "assets/backgrounds/Beach.jpg",
+    "bg-camping": "assets/backgrounds/Camping.jpg",
+    "tagline-overlay-black": "assets/taglines/TAGLINE_black.png",
+    "tagline-overlay-white": "assets/taglines/TAGLINE_white.png",
+    "brand-logo": "assets/brand/Yeti_Logo_1.png",
+    "brand-logo-black": "assets/brand/Yeti_Logo_1.png",
+    "brand-logo-white": "assets/brand/Yeti_Logo_4.png",
+    "gradient-product": "assets/gradients/#grad1.png",
+    "gradient-logo-white": "assets/gradients/#grad2.png",
+    "gradient-logo-black": "assets/gradients/#grad2_white.png",
+    "font-bold": "assets/fonts/DejaVuSans-Bold.ttf",
+    "font-regular": "assets/fonts/DejaVuSans.ttf"
+  },
+  "layoutReference": {
+    "square": "ad_examples/1_1.png",
+    "landscape": "ad_examples/16_9.png",
+    "vertical": "ad_examples/9_16.png"
+  },
+  "activityRules": {
+    "beach": {
+      "allowedBackgroundPoolIds": ["beach-west-coast"],
+      "logoAssetId": "brand-logo-white",
+      "taglineAssetId": "tagline-overlay-black",
+      "taglinePoolId": "beach-taglines",
+      "taglineTextColor": "#000000",
+      "taglineColorName": "Black"
+    },
+    "camping": {
+      "allowedBackgroundPoolIds": ["camping-la-mountains"],
+      "logoAssetId": "brand-logo-white",
+      "taglineAssetId": "tagline-overlay-white",
+      "taglinePoolId": "camping-taglines",
+      "taglineTextColor": "#FFFFFF",
+      "taglineColorName": "White"
+    },
+    "tailgating": {
+      "allowedBackgroundPoolIds": ["tailgating-westwood", "tailgating-south-central"],
+      "logoAssetId": "brand-logo-white",
+      "taglineAssetId": "tagline-overlay-white",
+      "taglinePoolId": "tailgating-taglines",
+      "taglineTextColor": "#FFFFFF",
+      "taglineColorName": "White"
+    },
+    "hiking": {
+      "allowedBackgroundPoolIds": ["hiking-la-trails"],
+      "logoAssetId": "brand-logo-white",
+      "taglineAssetId": "tagline-overlay-white",
+      "taglinePoolId": "hiking-taglines",
+      "taglineTextColor": "#FFFFFF",
+      "taglineColorName": "White"
+    },
+    "surfing": {
+      "allowedBackgroundPoolIds": ["surfing-pacific-coast"],
+      "logoAssetId": "brand-logo-white",
+      "taglineAssetId": "tagline-overlay-black",
+      "taglinePoolId": "surfing-taglines",
+      "taglineTextColor": "#000000",
+      "taglineColorName": "Black"
+    },
+    "fishing": {
+      "allowedBackgroundPoolIds": ["fishing-la-harbor"],
+      "logoAssetId": "brand-logo-black",
+      "taglineAssetId": "tagline-overlay-white",
+      "taglinePoolId": "fishing-taglines",
+      "taglineTextColor": "#FFFFFF",
+      "taglineColorName": "White"
+    },
+    "climbing": {
+      "allowedBackgroundPoolIds": ["climbing-stoney-point"],
+      "logoAssetId": "brand-logo-white",
+      "taglineAssetId": "tagline-overlay-white",
+      "taglinePoolId": "climbing-taglines",
+      "taglineTextColor": "#FFFFFF",
+      "taglineColorName": "White"
+    }
+  },
+  "creativeRules": {
+    "tagline": {
+      "placement": "lower-left",
+      "maximumLines": 2,
+      "activityRules": {
+        "beach": { "colorName": "Black", "hex": "#000000", "assetPath": "assets/taglines/TAGLINE_black.png" },
+        "camping": { "colorName": "White", "hex": "#FFFFFF", "assetPath": "assets/taglines/TAGLINE_white.png" },
+        "tailgating": { "colorName": "White", "hex": "#FFFFFF", "assetPath": "assets/taglines/TAGLINE_white.png" },
+        "hiking": { "colorName": "White", "hex": "#FFFFFF", "assetPath": "assets/taglines/TAGLINE_white.png" },
+        "surfing": { "colorName": "Black", "hex": "#000000", "assetPath": "assets/taglines/TAGLINE_black.png" },
+        "fishing": { "colorName": "White", "hex": "#FFFFFF", "assetPath": "assets/taglines/TAGLINE_white.png" },
+        "climbing": { "colorName": "White", "hex": "#FFFFFF", "assetPath": "assets/taglines/TAGLINE_white.png" }
+      }
+    },
+    "product": {
+      "rules": "Audience maximum age <= 24 requires orange cooler. Audience minimum age >= 25 requires white cooler.",
+      "ageMapping": {
+        "younger": { "ageRange": "20-24", "coolerColor": "Orange", "assetPath": "assets/products/cooler_orange.png" },
+        "older": { "ageRange": "25-30", "coolerColor": "White", "assetPath": "assets/products/cooler_white.png" }
+      }
+    }
+  },
+  "productAssets": {
+    "orange": {
+      "colorName": "Orange",
+      "assetCatalogId": "product-cooler-orange",
+      "assetPath": "assets/products/cooler_orange.png",
+      "assignedAgeBand": "20-24"
+    },
+    "white": {
+      "colorName": "White",
+      "assetCatalogId": "product-cooler-white",
+      "assetPath": "assets/products/cooler_white.png",
+      "assignedAgeBand": "25-30"
+    }
+  },
+  "taglineAssets": {
+    "black": {
+      "colorName": "Black",
+      "hex": "#000000",
+      "assetCatalogId": "tagline-overlay-black",
+      "assetPath": "assets/taglines/TAGLINE_black.png",
+      "activities": [
+        "beach",
+        "surfing"
+      ]
+    },
+    "white": {
+      "colorName": "White",
+      "hex": "#FFFFFF",
+      "assetCatalogId": "tagline-overlay-white",
+      "assetPath": "assets/taglines/TAGLINE_white.png",
+      "activities": [
+        "camping",
+        "tailgating",
+        "hiking",
+        "fishing",
+        "climbing"
+      ]
+    }
+  },
+  "backgroundPools": [
+
+    {
+      "id": "tailgating-westwood",
+      "activity": "tailgating",
+      "territory": "Westwood",
+      "visualDirection": "A lively but uncluttered Los Angeles game-day tailgate near Westwood.",
+      "assets": ["assets/backgrounds/Tailgate.jpg"]
+    },
+    {
+      "id": "tailgating-south-central",
+      "activity": "tailgating",
+      "territory": "South Central Los Angeles",
+      "visualDirection": "An energetic urban game-day tailgate in South Central Los Angeles.",
+      "assets": ["assets/backgrounds/Tailgate.jpg"]
+    },
+    {
+      "id": "beach-west-coast",
+      "activity": "beach",
+      "territory": "Westside Los Angeles coast",
+      "visualDirection": "A bright Westside Los Angeles beach environment with soft sand and coastal atmosphere.",
+      "assets": ["assets/backgrounds/Beach.jpg"]
+    },
+    {
+      "id": "camping-la-mountains",
+      "activity": "camping",
+      "territory": "Los Angeles mountain outskirts",
+      "visualDirection": "A calm mountain camping environment in the Los Angeles outskirts with trees and ridgelines.",
+      "assets": ["assets/backgrounds/Camping.jpg"]
+    },
+    {
+      "id": "hiking-la-trails",
+      "activity": "hiking",
+      "territory": "Hollywood Hills and Griffith Park",
+      "visualDirection": "Open scenic daylight photography of winding dirt trails across the Hollywood Hills and Griffith Park with vast negative space for product packshot.",
+      "assets": []
+    },
+    {
+      "id": "surfing-pacific-coast",
+      "activity": "surfing",
+      "territory": "Malibu Surfrider Beach",
+      "visualDirection": "Cinematic daylight photography of the Malibu coastline with rolling Pacific swell, clean sand, and uncluttered foreground.",
+      "assets": []
+    },
+    {
+      "id": "fishing-la-harbor",
+      "activity": "fishing",
+      "territory": "Marina Del Rey Coastal Waters",
+      "visualDirection": "Atmospheric morning photography of open blue Pacific water off Marina Del Rey with soft golden light and clear foreground space.",
+      "assets": []
+    },
+    {
+      "id": "climbing-stoney-point",
+      "activity": "climbing",
+      "territory": "Stoney Point Mountain Rocks",
+      "visualDirection": "Dramatic sandstone boulders and desert mountain backdrop in Stoney Point with clean foreground for cooler integration.",
+      "assets": []
+    }
+  ],
+  "taglinePools": [
+    {
+      "id": "tailgating-taglines",
+      "activity": "tailgating",
+      "textColor": "#FFFFFF",
+      "colorName": "White",
+      "assetCatalogId": "tagline-overlay-white",
+      "assetPath": "assets/taglines/TAGLINE_white.png",
+      "taglines": ["GO ANYWHERE"]
+    },
+    {
+      "id": "beach-taglines",
+      "activity": "beach",
+      "textColor": "#000000",
+      "colorName": "Black",
+      "assetCatalogId": "tagline-overlay-black",
+      "assetPath": "assets/taglines/TAGLINE_black.png",
+      "taglines": ["GO ANYWHERE"]
+    },
+    {
+      "id": "camping-taglines",
+      "activity": "camping",
+      "textColor": "#FFFFFF",
+      "colorName": "White",
+      "assetCatalogId": "tagline-overlay-white",
+      "assetPath": "assets/taglines/TAGLINE_white.png",
+      "taglines": ["GO ANYWHERE"]
+    },
+    {
+      "id": "hiking-taglines",
+      "activity": "hiking",
+      "textColor": "#FFFFFF",
+      "colorName": "White",
+      "assetCatalogId": "tagline-overlay-white",
+      "assetPath": "assets/taglines/TAGLINE_white.png",
+      "taglines": ["GO ANYWHERE"]
+    },
+    {
+      "id": "surfing-taglines",
+      "activity": "surfing",
+      "textColor": "#000000",
+      "colorName": "Black",
+      "assetCatalogId": "tagline-overlay-black",
+      "assetPath": "assets/taglines/TAGLINE_black.png",
+      "taglines": ["GO ANYWHERE"]
+    },
+    {
+      "id": "fishing-taglines",
+      "activity": "fishing",
+      "textColor": "#FFFFFF",
+      "colorName": "White",
+      "assetCatalogId": "tagline-overlay-white",
+      "assetPath": "assets/taglines/TAGLINE_white.png",
+      "taglines": ["GO ANYWHERE"]
+    },
+    {
+      "id": "climbing-taglines",
+      "activity": "climbing",
+      "textColor": "#FFFFFF",
+      "colorName": "White",
+      "assetCatalogId": "tagline-overlay-white",
+      "assetPath": "assets/taglines/TAGLINE_white.png",
+      "taglines": ["GO ANYWHERE"]
+    }
+  ],
+  "audiences": [
+    {
+      "id": "P01",
+      "name": "Westwood College Tailgaters",
+      "age": { "minimum": 20, "maximum": 23, "band": "younger" },
+      "lifeStage": "Undergraduate college student",
+      "activity": "tailgating",
+      "territory": "Westwood",
+      "backgroundPoolId": "tailgating-westwood",
+      "taglinePoolId": "tailgating-taglines",
+      "productModel": "YETI Roadie 24",
+      "productColor": "orange",
+      "productAssetId": "orange"
+    },
+    {
+      "id": "P02",
+      "name": "South Central College Tailgaters",
+      "age": { "minimum": 20, "maximum": 24, "band": "younger" },
+      "lifeStage": "Undergraduate college student",
+      "activity": "tailgating",
+      "territory": "South Central Los Angeles",
+      "backgroundPoolId": "tailgating-south-central",
+      "taglinePoolId": "tailgating-taglines",
+      "productModel": "YETI Tundra 45",
+      "productColor": "orange",
+      "productAssetId": "orange"
+    },
+    {
+      "id": "P03",
+      "name": "Westside Recent Graduates",
+      "age": { "minimum": 25, "maximum": 27, "band": "older" },
+      "lifeStage": "College graduate or young professional",
+      "activity": "beach",
+      "territory": "Westside Los Angeles coast",
+      "backgroundPoolId": "beach-west-coast",
+      "taglinePoolId": "beach-taglines",
+      "productModel": "YETI Roadie 24",
+      "productColor": "white",
+      "productAssetId": "white"
+    },
+    {
+      "id": "P04",
+      "name": "College Friends Beach Day",
+      "age": { "minimum": 20, "maximum": 24, "band": "younger" },
+      "lifeStage": "Undergraduate and summer interns",
+      "activity": "beach",
+      "territory": "Westside Los Angeles coast",
+      "backgroundPoolId": "beach-west-coast",
+      "taglinePoolId": "beach-taglines",
+      "productModel": "YETI Tundra 45",
+      "productColor": "orange",
+      "productAssetId": "orange"
+    },
+    {
+      "id": "P05",
+      "name": "Malibu Coastal Campers",
+      "age": { "minimum": 25, "maximum": 29, "band": "older" },
+      "lifeStage": "Young professional weekend camper",
+      "activity": "camping",
+      "territory": "Los Angeles mountain outskirts",
+      "backgroundPoolId": "camping-la-mountains",
+      "taglinePoolId": "camping-taglines",
+      "productModel": "YETI Tundra 45",
+      "productColor": "white",
+      "productAssetId": "white"
+    },
+    {
+      "id": "P06",
+      "name": "Graduate Adventure Campers",
+      "age": { "minimum": 25, "maximum": 30, "band": "older" },
+      "lifeStage": "Graduate student or young professional",
+      "activity": "camping",
+      "territory": "Los Angeles mountain outskirts",
+      "backgroundPoolId": "camping-la-mountains",
+      "taglinePoolId": "camping-taglines",
+      "productModel": "YETI Roadie 24",
+      "productColor": "white",
+      "productAssetId": "white"
+    },
+    {
+      "id": "P07",
+      "name": "Hollywood Hills Trail Hikers (Gemini AI Scene)",
+      "age": { "minimum": 20, "maximum": 23, "band": "younger" },
+      "lifeStage": "College outdoor fitness club",
+      "activity": "hiking",
+      "territory": "Hollywood Hills and Griffith Park",
+      "backgroundPoolId": "hiking-la-trails",
+      "taglinePoolId": "hiking-taglines",
+      "productModel": "YETI Roadie 24",
+      "productColor": "orange",
+      "productAssetId": "orange"
+    },
+    {
+      "id": "P08",
+      "name": "Griffith Park Ridgeline Trekkers (Gemini AI Scene)",
+      "age": { "minimum": 26, "maximum": 30, "band": "older" },
+      "lifeStage": "Young professional weekend trail runners",
+      "activity": "hiking",
+      "territory": "Hollywood Hills and Griffith Park",
+      "backgroundPoolId": "hiking-la-trails",
+      "taglinePoolId": "hiking-taglines",
+      "productModel": "YETI Tundra 45",
+      "productColor": "white",
+      "productAssetId": "white"
+    },
+    {
+      "id": "P09",
+      "name": "Malibu Point Dawn Surfers (Gemini AI Scene)",
+      "age": { "minimum": 21, "maximum": 24, "band": "younger" },
+      "lifeStage": "Collegiate surf team",
+      "activity": "surfing",
+      "territory": "Malibu Surfrider Beach",
+      "backgroundPoolId": "surfing-pacific-coast",
+      "taglinePoolId": "surfing-taglines",
+      "productModel": "YETI Roadie 24",
+      "productColor": "orange",
+      "productAssetId": "orange"
+    },
+    {
+      "id": "P10",
+      "name": "South Bay Sunset Surfers (Gemini AI Scene)",
+      "age": { "minimum": 25, "maximum": 29, "band": "older" },
+      "lifeStage": "Coastal young professionals",
+      "activity": "surfing",
+      "territory": "Malibu Surfrider Beach",
+      "backgroundPoolId": "surfing-pacific-coast",
+      "taglinePoolId": "surfing-taglines",
+      "productModel": "YETI Tundra 45",
+      "productColor": "white",
+      "productAssetId": "white"
+    },
+    {
+      "id": "P11",
+      "name": "Marina Del Rey Anglers (Gemini AI Scene)",
+      "age": { "minimum": 22, "maximum": 24, "band": "younger" },
+      "lifeStage": "Coastal adventure anglers",
+      "activity": "fishing",
+      "territory": "Marina Del Rey Coastal Waters",
+      "backgroundPoolId": "fishing-la-harbor",
+      "taglinePoolId": "fishing-taglines",
+      "productModel": "YETI Roadie 24",
+      "productColor": "orange",
+      "productAssetId": "orange"
+    },
+    {
+      "id": "P12",
+      "name": "Stoney Point Rock Climbers (Gemini AI Scene)",
+      "age": { "minimum": 25, "maximum": 30, "band": "older" },
+      "lifeStage": "Weekend bouldering and climbing crew",
+      "activity": "climbing",
+      "territory": "Stoney Point Mountain Rocks",
+      "backgroundPoolId": "climbing-stoney-point",
+      "taglinePoolId": "climbing-taglines",
+      "productModel": "YETI Tundra 45",
+      "productColor": "white",
+      "productAssetId": "white"
+    }
+  ],
+  "outputFormats": [
+    { "id": "square", "aspectRatio": "1:1", "width": 1080, "height": 1080, "filenameTag": "1x1" },
+    { "id": "landscape", "aspectRatio": "16:9", "width": 1920, "height": 1080, "filenameTag": "16x9" },
+    { "id": "vertical", "aspectRatio": "9:16", "width": 1080, "height": 1920, "filenameTag": "9x16" }
+  ],
+  "composition": {
+    "layersBackToFront": [
+      "selectedBackground",
+      "topLogoGradient",
+      "productGlowGradient",
+      "productShadow",
+      "selectedProductAsset",
+      "selectedTaglineAsset",
+      "selectedBrandLogo"
+    ],
+    "logoAssetPath": "assets/brand/Yeti_Logo_1.png",
+    "taglineColorRule": "Beach/Surfing: #000000 (Black), Camping/Tailgating/Hiking/Fishing/Climbing: #FFFFFF (White)",
+    "defaultCallToAction": "Explore YETI"
+  },
+  "qualityChecks": [
+    "background activity matches audience activity",
+    "background pool matches assigned territory",
+    "tagline color is #000000 for beach/surfing and #FFFFFF for camping/tailgating/hiking/fishing/climbing",
+    "tagline remains readable against background",
+    "audiences age 20-24 use the orange product asset",
+    "audiences age 25-30 use the white product asset",
+    "product shape and logo are not distorted",
+    "no unlicensed UCLA or USC marks appear",
+    "all three output formats are created for every audience",
+    "final dimensions match the selected output format"
+  ],
+  "output": {
+    "directory": "outputs/yeti-la-go-anywhere-2026",
+    "filenamePattern": "{campaignId}_{audienceId}_{activity}_{productColor}_{backgroundIndex}_{taglineIndex}_{formatTag}.png",
+    "writeManifest": true,
+    "manifestFilename": "generation-manifest.json"
+  }
+}

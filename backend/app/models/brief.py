@@ -132,10 +132,10 @@ class TaglineAsset(BaseModel):
 
 class BackgroundPool(BaseModel):
     id: str
-    activity: Literal["tailgating", "beach", "camping"]
+    activity: str
     territory: str
     visualDirection: str
-    assets: List[str]
+    assets: List[str] = Field(default_factory=list)
 
     @field_validator("assets")
     @classmethod
@@ -147,7 +147,7 @@ class BackgroundPool(BaseModel):
 
 class TaglinePool(BaseModel):
     id: str
-    activity: Literal["tailgating", "beach", "camping"]
+    activity: str
     textColor: str
     colorName: Optional[str] = None
     taglines: List[str] = Field(min_length=1)
@@ -155,11 +155,11 @@ class TaglinePool(BaseModel):
     @model_validator(mode="after")
     def validate_tagline_color_activity_match(self):
         hex_norm = self.textColor.strip().upper()
-        if self.activity == "beach" and hex_norm not in ["#000000", "#000", "BLACK"]:
+        if self.activity in ["beach", "surfing"] and hex_norm not in ["#000000", "#000", "BLACK"]:
             raise ValueError(
-                f"Tagline pool '{self.id}' for activity 'beach' must have black text (#000000), but found '{self.textColor}'."
+                f"Tagline pool '{self.id}' for activity '{self.activity}' must have black text (#000000), but found '{self.textColor}'."
             )
-        if self.activity in ["camping", "tailgating"] and hex_norm not in ["#FFFFFF", "#FFF", "WHITE"]:
+        if self.activity in ["camping", "tailgating", "hiking", "fishing", "climbing"] and hex_norm not in ["#FFFFFF", "#FFF", "WHITE"]:
             raise ValueError(
                 f"Tagline pool '{self.id}' for activity '{self.activity}' must have white text (#FFFFFF), but found '{self.textColor}'."
             )
@@ -172,7 +172,7 @@ class Audience(BaseModel):
 
     age: AudienceAgeRange
     lifeStage: str
-    activity: Literal["tailgating", "beach", "camping"]
+    activity: str
     territory: str
     backgroundPoolId: str
     taglinePoolId: str
@@ -193,23 +193,21 @@ class Audience(BaseModel):
             )
         
         # 2. Activity to Background Pool Mapping
-        if self.activity == "beach":
-            if self.backgroundPoolId != "beach-west-coast":
-                raise ValueError(
-                    f"Audience {self.id} ({self.name}) has activity 'beach' and must resolve strictly to 'beach-west-coast' background pool, but found '{self.backgroundPoolId}'."
-                )
-        elif self.activity == "camping":
-            if self.backgroundPoolId != "camping-la-mountains":
-                raise ValueError(
-                    f"Audience {self.id} ({self.name}) has activity 'camping' and must resolve strictly to 'camping-la-mountains' background pool, but found '{self.backgroundPoolId}'."
-                )
-        elif self.activity == "tailgating":
-            if self.backgroundPoolId not in ["tailgating-westwood", "tailgating-south-central"]:
-                raise ValueError(
-                    f"Audience {self.id} ({self.name}) has activity 'tailgating' and must resolve strictly to Westwood or South Central tailgating pool, but found '{self.backgroundPoolId}'."
-                )
+        if self.activity == "beach" and self.backgroundPoolId != "beach-west-coast":
+            raise ValueError(
+                f"Audience {self.id} ({self.name}) has activity 'beach' and must resolve strictly to 'beach-west-coast' background pool, but found '{self.backgroundPoolId}'."
+            )
+        elif self.activity == "camping" and self.backgroundPoolId != "camping-la-mountains":
+            raise ValueError(
+                f"Audience {self.id} ({self.name}) has activity 'camping' and must resolve strictly to 'camping-la-mountains' background pool, but found '{self.backgroundPoolId}'."
+            )
+        elif self.activity == "tailgating" and self.backgroundPoolId not in ["tailgating-westwood", "tailgating-south-central"]:
+            raise ValueError(
+                f"Audience {self.id} ({self.name}) has activity 'tailgating' and must resolve strictly to Westwood or South Central tailgating pool, but found '{self.backgroundPoolId}'."
+            )
         
         return self
+
 
 
 class OutputFormat(BaseModel):

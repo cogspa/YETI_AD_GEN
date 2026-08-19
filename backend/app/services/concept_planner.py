@@ -93,24 +93,25 @@ class ConceptPlanner:
 
                 pool_bgs = bg_pool.assets
                 if not pool_bgs:
-                    raise ValueError(f"Background pool '{audience.backgroundPoolId}' has no assets.")
+                    # Empty asset pool: mark for automatic Gemini AI generation in pipeline Stage 5
+                    selected_bg = f"outputs/generated-backgrounds/{audience.activity}-{audience.id}-pending.png"
+                else:
+                    # Filter against prior manifest if alternative options exist
+                    prev_bg = prior_audience_choices.get(audience.id, {}).get("background")
+                    eligible_bgs = [bg for bg in pool_bgs if bg != prev_bg] if len(pool_bgs) > 1 and prev_bg else pool_bgs
 
-                # Filter against prior manifest if alternative options exist
-                prev_bg = prior_audience_choices.get(audience.id, {}).get("background")
-                eligible_bgs = [bg for bg in pool_bgs if bg != prev_bg] if len(pool_bgs) > 1 and prev_bg else pool_bgs
+                    # Current run least-recently-used selection
+                    min_usage = min(current_run_bg_usage[bg] for bg in eligible_bgs)
+                    least_used_bgs = [bg for bg in eligible_bgs if current_run_bg_usage[bg] == min_usage]
 
-                # Current run least-recently-used selection
-                min_usage = min(current_run_bg_usage[bg] for bg in eligible_bgs)
-                least_used_bgs = [bg for bg in eligible_bgs if current_run_bg_usage[bg] == min_usage]
+                    # Deterministic selection from least-used
+                    selected_bg = rng.choice(least_used_bgs)
 
-                # Deterministic selection from least-used
-                selected_bg = rng.choice(least_used_bgs)
-
-                if current_run_bg_usage[selected_bg] > 0:
-                    warnings.append(
-                        f"Pool '{audience.backgroundPoolId}' exhausted: background '{selected_bg}' reused for audience {audience.id}."
-                    )
-                current_run_bg_usage[selected_bg] += 1
+                    if current_run_bg_usage[selected_bg] > 0:
+                        warnings.append(
+                            f"Pool '{audience.backgroundPoolId}' exhausted: background '{selected_bg}' reused for audience {audience.id}."
+                        )
+                    current_run_bg_usage[selected_bg] += 1
 
                 # Step C: Activity -> Tagline Asset & Text Selection
                 tag_pool = tagline_pool_map.get(audience.taglinePoolId)
@@ -127,12 +128,13 @@ class ConceptPlanner:
                 current_run_tagline_usage[selected_tag_text] += 1
 
                 # Activity Color & Tagline Asset
-                if audience.activity == "beach":
+                if audience.activity in ["beach", "surfing"]:
                     tagline_color_hex = "#000000"
                     tagline_res = self.resolver.resolve_role("tagline_black")
                 else:
                     tagline_color_hex = "#FFFFFF"
                     tagline_res = self.resolver.resolve_role("tagline_white")
+
 
                 # Step D: Brand Logo (Crisp white wordmark)
                 logo_res = self.resolver.resolve_logo_for_activity(audience.activity)

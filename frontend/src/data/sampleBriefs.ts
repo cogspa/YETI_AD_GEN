@@ -295,20 +295,123 @@ export const SAMPLE_BRIEFS: { id: string; filename: string; label: string; brief
   {
     id: "yeti-la-go-anywhere-2026",
     filename: "yeti-la-go-anywhere-2026.json",
-    label: "yeti-la-go-anywhere-2026.json",
+    label: "yeti-la-go-anywhere-2026.json (18 Ads)",
     brief: YETI_GO_ANYWHERE_2026_BRIEF
   },
   {
-    id: "yeti-la-summer-2026",
-    filename: "yeti-la-summer-2026.json",
-    label: "yeti-la-summer-2026.json",
+    id: "yeti-la-random-ad-campaign-36",
+    filename: "yeti_la_random_ad_campaign_36.json",
+    label: "yeti_la_random_ad_campaign_36.json (36 Ads)",
+    brief: {
+      ...YETI_GO_ANYWHERE_2026_BRIEF,
+      generation: {
+        ...YETI_GO_ANYWHERE_2026_BRIEF.generation,
+        conceptsPerAudience: 2,
+        totalAudienceGroups: 6,
+        adsPerAudience: 6,
+        totalOutputsPerRun: 36
+      }
+    }
+  },
+  {
+    id: "yeti-la-random-ad-campaign-72",
+    filename: "yeti_la_random_ad_campaign_72.json",
+    label: "yeti_la_random_ad_campaign_72.json (72 Ads - 12 Demographics + Gemini AI)",
     brief: {
       ...YETI_GO_ANYWHERE_2026_BRIEF,
       campaign: {
         ...YETI_GO_ANYWHERE_2026_BRIEF.campaign,
-        id: "yeti-la-summer-2026",
-        name: "Go Anywhere with YETI (Summer 2026)"
-      }
+        name: "Go Anywhere with YETI (72-Ad Multi-Audience Campaign)"
+      },
+      generation: {
+        ...YETI_GO_ANYWHERE_2026_BRIEF.generation,
+        conceptsPerAudience: 2,
+        totalAudienceGroups: 12,
+        adsPerAudience: 6,
+        totalOutputsPerRun: 72
+      },
+      audiences: [
+        ...YETI_GO_ANYWHERE_2026_BRIEF.audiences,
+        {
+          id: "P07",
+          name: "Hollywood Hills Trail Hikers (Gemini AI Scene)",
+          age: { minimum: 20, maximum: 23, band: "younger" },
+          lifeStage: "College outdoor fitness club",
+          activity: "hiking",
+          territory: "Hollywood Hills and Griffith Park",
+          backgroundPoolId: "hiking-la-trails",
+          taglinePoolId: "hiking-taglines",
+          productModel: "YETI Roadie 24",
+          productColor: "orange",
+          productAssetId: "orange"
+        },
+        {
+          id: "P08",
+          name: "Griffith Park Ridgeline Trekkers (Gemini AI Scene)",
+          age: { minimum: 26, maximum: 30, band: "older" },
+          lifeStage: "Young professional weekend trail runners",
+          activity: "hiking",
+          territory: "Hollywood Hills and Griffith Park",
+          backgroundPoolId: "hiking-la-trails",
+          taglinePoolId: "hiking-taglines",
+          productModel: "YETI Tundra 45",
+          productColor: "white",
+          productAssetId: "white"
+        },
+        {
+          id: "P09",
+          name: "Malibu Point Dawn Surfers (Gemini AI Scene)",
+          age: { minimum: 21, maximum: 24, band: "younger" },
+          lifeStage: "Collegiate surf team",
+          activity: "surfing",
+          territory: "Malibu Surfrider Beach",
+          backgroundPoolId: "surfing-pacific-coast",
+          taglinePoolId: "surfing-taglines",
+          productModel: "YETI Roadie 24",
+          productColor: "orange",
+          productAssetId: "orange"
+        },
+        {
+          id: "P10",
+          name: "South Bay Sunset Surfers (Gemini AI Scene)",
+          age: { minimum: 25, maximum: 29, band: "older" },
+          lifeStage: "Coastal young professionals",
+          activity: "surfing",
+          territory: "Malibu Surfrider Beach",
+          backgroundPoolId: "surfing-pacific-coast",
+          taglinePoolId: "surfing-taglines",
+          productModel: "YETI Tundra 45",
+          productColor: "white",
+          productAssetId: "white"
+        },
+        {
+          id: "P11",
+          name: "Marina Del Rey Anglers (Gemini AI Scene)",
+          age: { minimum: 22, maximum: 24, band: "younger" },
+          lifeStage: "Coastal adventure anglers",
+          activity: "fishing",
+          territory: "Marina Del Rey Coastal Waters",
+          backgroundPoolId: "fishing-la-harbor",
+          taglinePoolId: "fishing-taglines",
+          productModel: "YETI Roadie 24",
+          productColor: "orange",
+          productAssetId: "orange"
+        },
+        {
+          id: "P12",
+          name: "Stoney Point Rock Climbers (Gemini AI Scene)",
+          age: { minimum: 25, maximum: 30, band: "older" },
+          lifeStage: "Weekend bouldering and climbing crew",
+          activity: "climbing",
+          territory: "Stoney Point Mountain Rocks",
+          backgroundPoolId: "climbing-stoney-point",
+          taglinePoolId: "climbing-taglines",
+          productModel: "YETI Tundra 45",
+          productColor: "white",
+          productAssetId: "white"
+        }
+      ]
     }
   }
 ];
+
