@@ -210,10 +210,11 @@ export const App: React.FC = () => {
           currentStage={currentStage}
           progressPct={progressPct}
           completedItems={completedItems}
-          totalItems={18}
+          totalItems={validation.totalOutputs || 18}
           error={generationError}
           onClose={() => setShowProgressModal(false)}
         />
+
 
         {/* Lightbox Preview Modal */}
         <LightboxModal

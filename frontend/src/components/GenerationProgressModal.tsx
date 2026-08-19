@@ -14,9 +14,9 @@ const STAGES = [
   'Validating JSON',
   'Resolving controlled assets',
   'Reading repeat history',
-  'Selecting six concepts',
+  'Selecting concepts',
   'Generating missing backgrounds if needed',
-  'Rendering 18 adaptations',
+  'Rendering adaptations',
   'Running checks',
   'Uploading to Dropbox',
   'Complete',
@@ -33,7 +33,14 @@ export const GenerationProgressModal: React.FC<GenerationProgressModalProps> = (
 }) => {
   if (!isOpen) return null;
 
-  const currentStageIndex = STAGES.indexOf(currentStage);
+  const normalizeStage = (s: string) => {
+    if (s.startsWith('Selecting')) return 'Selecting concepts';
+    if (s.startsWith('Rendering')) return 'Rendering adaptations';
+    return s;
+  };
+
+  const normCurrentStage = normalizeStage(currentStage);
+  const currentStageIndex = STAGES.indexOf(normCurrentStage);
 
   return (
     <div className="modal-overlay-bg">
@@ -42,7 +49,7 @@ export const GenerationProgressModal: React.FC<GenerationProgressModalProps> = (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ color: '#00D2FF', fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '18px', letterSpacing: '0.1em' }}>YETI</span>
-            <span style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: '16px' }}>Generating 18 Ads</span>
+            <span style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: '16px' }}>Generating {totalItems} Ads</span>
           </div>
           {currentStage === 'Complete' && (
             <span className="badge-count" style={{ fontSize: '11px' }}>READY</span>
@@ -75,7 +82,7 @@ export const GenerationProgressModal: React.FC<GenerationProgressModalProps> = (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto', marginBottom: '20px' }}>
           {STAGES.map((stg, idx) => {
             const isDone = currentStageIndex > idx || currentStage === 'Complete';
-            const isCurrent = currentStage === stg;
+            const isCurrent = normCurrentStage === stg;
 
             return (
               <div
@@ -97,14 +104,15 @@ export const GenerationProgressModal: React.FC<GenerationProgressModalProps> = (
                   <span>{isDone ? '✓' : isCurrent ? '▶' : '○'}</span>
                   <span>{stg}</span>
                 </div>
-                {isCurrent && stg === 'Rendering 18 adaptations' && (
-                  <span style={{ color: '#FF8A00', fontWeight: 'bold' }}>{completedItems}/18</span>
+                {isCurrent && stg === 'Rendering adaptations' && (
+                  <span style={{ color: '#FF8A00', fontWeight: 'bold' }}>{completedItems}/{totalItems}</span>
                 )}
                 {isDone && <span style={{ color: '#5E7387' }}>Done</span>}
               </div>
             );
           })}
         </div>
+
 
         {/* Error message */}
         {error && (

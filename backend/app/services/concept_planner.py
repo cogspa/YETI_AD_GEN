@@ -30,10 +30,11 @@ class ConceptPlanner:
         prior_manifest: Optional[Dict[str, Any]] = None,
     ) -> CampaignPlanResult:
         """
-        Generate exactly 6 AudienceConcepts and 18 FormatRenderPlans.
+        Generate AudienceConcepts and FormatRenderPlans based on brief configuration.
         """
-        if len(brief.audiences) != 6:
-            raise ValueError(f"Brief must contain exactly 6 audiences, found {len(brief.audiences)}.")
+        if not brief.audiences:
+            raise ValueError("Brief must contain at least 1 audience.")
+
 
         # 1. Deterministic Random Generator Setup
         effective_seed = seed if seed is not None else brief.generation.seed
@@ -153,8 +154,11 @@ class ConceptPlanner:
             )
             concepts.append(concept)
 
-            # Step F: Expand Concept to 3 Ratio Render Plans (1:1, 16:9, 9:16)
-            for ratio_name in ["1:1", "16:9", "9:16"]:
+            # Step F: Expand Concept to Format Render Plans based on brief.outputFormats
+            for output_fmt in brief.outputFormats:
+                ratio_name = output_fmt.aspectRatio
+                if ratio_name not in LAYOUT_CONFIGS:
+                    continue
                 layout_cfg = LAYOUT_CONFIGS[ratio_name]
                 clean_ratio = ratio_name.replace(":", "x")
                 plan_id = f"plan-{concept.concept_id}-{clean_ratio}"
@@ -176,6 +180,7 @@ class ConceptPlanner:
                     layout_config=layout_cfg,
                 )
                 render_plans.append(render_plan)
+
 
         return CampaignPlanResult(
             campaign_id=brief.campaign.id,

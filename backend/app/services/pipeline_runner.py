@@ -83,7 +83,10 @@ class CampaignPipelineRunner:
                 entry["data"] = {k: redact_secrets(str(v)) if isinstance(v, str) else v for k, v in extra.items()}
             log_entries.append(entry)
 
-        def emit_event(stage: str, pct: int, completed: int, msg: str):
+        # Target total ads count (default or from plan)
+        expected_total_ads = len(brief_dict.get("audiences", [])) * len(brief_dict.get("outputFormats", [])) if brief_dict.get("audiences") and brief_dict.get("outputFormats") else 18
+
+        def emit_event(stage: str, pct: int, completed: int, msg: str, total: Optional[int] = None):
             log_entry(stage, "INFO", msg)
             if progress_callback:
                 progress_callback(
@@ -91,7 +94,7 @@ class CampaignPipelineRunner:
                         stage=stage,
                         progress_pct=pct,
                         completed_items=completed,
-                        total_items=18,
+                        total_items=total if total is not None else expected_total_ads,
                         message=msg,
                     )
                 )
@@ -114,8 +117,6 @@ class CampaignPipelineRunner:
             log_entry("Resolving controlled assets", "ERROR", f"Missing blocking assets: {readiness.summary_messages}")
             raise RuntimeError(f"Missing blocking assets: {', '.join(readiness.summary_messages)}")
 
-
-
         # Stage 3: Reading repeat history
         emit_event("Reading repeat history", 25, 0, "Checking prior run manifests for repeat avoidance...")
         prior_manifest = None
@@ -131,17 +132,20 @@ class CampaignPipelineRunner:
                 except Exception as e:
                     log_entry("Reading repeat history", "WARNING", f"Could not load prior manifest: {e}")
 
-
-        # Stage 4: Selecting six concepts
-        emit_event("Selecting six concepts", 35, 0, f"Deterministically generating 6 audience plans with seed {effective_seed}...")
+        # Stage 4: Selecting concepts
+        total_audiences_count = len(brief_model.audiences)
+        emit_event("Selecting concepts", 35, 0, f"Deterministically generating {total_audiences_count} audience plans with seed {effective_seed}...")
         plan_result = self.planner.plan_campaign(
             brief=brief_model,
             seed=effective_seed,
             prior_manifest=prior_manifest,
         )
 
+        total_ads = len(plan_result.render_plans)
+        expected_total_ads = total_ads
+
         # Stage 5: Generating missing backgrounds if needed
-        emit_event("Generating missing backgrounds if needed", 45, 0, "Checking if AI background fallback is required...")
+        emit_event("Generating missing backgrounds if needed", 45, 0, "Checking if AI background fallback is required...", total=total_ads)
         gemini_used = False
         gemini_audiences: List[str] = []
 
@@ -153,6 +157,7 @@ class CampaignPipelineRunner:
                     50,
                     0,
                     f"Generating missing background for {concept.audience_name} ({concept.activity})...",
+                    total=total_ads,
                 )
                 bg_result = self.gemini.generate_for_audience(
                     activity=concept.activity,
@@ -172,14 +177,14 @@ class CampaignPipelineRunner:
         ads_output_dir = run_dir / "outputs"
         ads_output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Stage 6: Rendering 18 adaptations
-        emit_event("Rendering 18 adaptations", 55, 0, "Starting composite rendering for 6 concepts across 3 formats...")
+        # Stage 6: Rendering adaptations
+        emit_event(f"Rendering {total_ads} adaptations", 55, 0, f"Starting composite rendering for {len(plan_result.concepts)} concepts across {len(brief_model.outputFormats)} formats...", total=total_ads)
         ads: List[GeneratedAdArtifact] = []
         render_plans: List[FormatRenderPlan] = []
         concepts: List[AudienceConcept] = []
 
         completed_ads = 0
-        total_ads = 18
+
 
         for concept in plan_result.concepts:
             concepts.append(
@@ -207,7 +212,8 @@ class CampaignPipelineRunner:
             aud_dir = ads_output_dir / concept.audience_id
             aud_dir.mkdir(parents=True, exist_ok=True)
 
-            for ratio in ["1:1", "16:9", "9:16"]:
+            for output_fmt in brief_model.outputFormats:
+                ratio = output_fmt.aspectRatio
                 fmt_folder = aud_dir / ratio.replace(":", "x")
                 fmt_folder.mkdir(parents=True, exist_ok=True)
 
@@ -232,7 +238,6 @@ class CampaignPipelineRunner:
 
                 filesize = out_path.stat().st_size
                 dims = (rendered_img.width, rendered_img.height)
-
 
                 # Relative path for serving
                 rel_path = str(out_path.relative_to(self.base_dir)).replace("\\", "/")
@@ -266,18 +271,17 @@ class CampaignPipelineRunner:
                 completed_ads += 1
                 progress_pct = 55 + int((completed_ads / total_ads) * 20)
                 emit_event(
-                    "Rendering 18 adaptations",
+                    f"Rendering {total_ads} adaptations",
                     progress_pct,
                     completed_ads,
                     f"Rendered {concept.audience_id} ({ratio}) - {completed_ads}/{total_ads}",
+                    total=total_ads,
                 )
 
         render_plans = plan_result.render_plans
 
-
-
         # Stage 7: Contact Sheet Generation
-        emit_event("Generating contact sheet", 78, 18, "Assembling master 6x3 campaign contact sheet...")
+        emit_event("Generating contact sheet", 78, completed_ads, f"Assembling master campaign contact sheet ({len(concepts)}x{len(brief_model.outputFormats)})...", total=total_ads)
         contact_sheet_local = run_dir / "contact-sheet.jpg"
         generate_campaign_contact_sheet(
             campaign_name=brief_model.campaign.name,
@@ -292,7 +296,7 @@ class CampaignPipelineRunner:
         cs_preview_url = f"/api/outputs/{cs_rel_path}"
 
         # Stage 8: Generate ZIP Bundle
-        zip_local_path = run_dir / f"{brief_model.campaign.id}_{run_id}_all_18_ads.zip"
+        zip_local_path = run_dir / f"{brief_model.campaign.id}_{run_id}_all_{total_ads}_ads.zip"
         with zipfile.ZipFile(zip_local_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             for ad in ads:
                 zf.write(ad.local_path, arcname=f"{ad.audience_id}/{ad.filename}")
@@ -302,7 +306,7 @@ class CampaignPipelineRunner:
         zip_download_url = f"/api/outputs/{zip_rel_path}"
 
         # Stage 9: Running deterministic checks & Quality Report
-        emit_event("Running checks", 85, 18, "Executing 8 blocking rules and quality heuristics...")
+        emit_event("Running checks", 85, completed_ads, "Executing blocking rules and quality heuristics...", total=total_ads)
         storage = get_storage_adapter()
         storage_status = storage.get_status()
 
@@ -333,8 +337,8 @@ class CampaignPipelineRunner:
             "runId": run_id,
             "seed": effective_seed,
             "generatedAt": datetime.now(timezone.utc).isoformat(),
-            "totalConcepts": 6,
-            "totalAds": 18,
+            "totalConcepts": len(concepts),
+            "totalAds": len(ads),
             "status": quality_report.status,
             "blockingChecksPassed": f"{quality_report.blocking_checks_passed}/{quality_report.blocking_checks_total}",
             "concepts": [c.model_dump() for c in concepts],
@@ -352,7 +356,6 @@ class CampaignPipelineRunner:
         manifest_rel_path = str(manifest_local.relative_to(self.base_dir)).replace("\\", "/")
         manifest_url = f"/api/outputs/{manifest_rel_path}"
 
-
         # Write Secret-safe JSONL pipeline log
         log_entry("Pipeline Execution", "INFO", f"Completed run {run_id} successfully.")
         log_local = run_dir / "pipeline.log"
@@ -363,7 +366,7 @@ class CampaignPipelineRunner:
         log_url = f"/api/outputs/{log_rel_path}"
 
         # Stage 11: Uploading to Dropbox / Storage
-        emit_event("Uploading to Dropbox", 92, 18, "Uploading ads, contact sheet, report, and logs to storage...")
+        emit_event("Uploading to Dropbox", 92, completed_ads, "Uploading ads, contact sheet, report, and logs to storage...", total=total_ads)
         dropbox_shared_link = None
         dropbox_folder = f"campaigns/{brief_model.campaign.id}/runs/{run_id}"
 
@@ -381,7 +384,7 @@ class CampaignPipelineRunner:
                 overwrite=True,
             )
 
-            # Concurrent upload of 18 ads, contact sheet, report, and pipeline log
+            # Concurrent upload of ads, contact sheet, report, and pipeline log
             upload_tasks = [
                 (str(report_local), f"campaigns/{brief_model.campaign.id}/runs/{run_id}/generation-report.json"),
                 (str(log_local), f"campaigns/{brief_model.campaign.id}/runs/{run_id}/pipeline.log"),
@@ -405,9 +408,9 @@ class CampaignPipelineRunner:
         except Exception as e:
             plan_result.warnings.append(f"Remote storage upload warning: {str(e)}")
 
-
         duration = round(time.time() - start_time, 2)
-        emit_event("Complete", 100, 18, f"Successfully generated all 18 ads in {duration}s!")
+        emit_event("Complete", 100, completed_ads, f"Successfully generated all {total_ads} ads in {duration}s!", total=total_ads)
+
 
         return CampaignRunResult(
             run_id=run_id,

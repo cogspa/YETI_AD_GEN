@@ -71,6 +71,7 @@ def test_full_pipeline_execution(runner, brief_dict):
     stages = [e.stage for e in events]
     assert "Validating JSON" in stages
     assert "Resolving controlled assets" in stages
-    assert "Selecting six concepts" in stages
-    assert "Rendering 18 adaptations" in stages
+    assert any("Selecting" in s for s in stages)
+    assert any("Rendering" in s for s in stages)
     assert "Complete" in stages
+

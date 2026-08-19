@@ -90,26 +90,47 @@ def test_rejects_beach_with_white_tagline(valid_brief_data):
     assert any("must have black text (#000000)" in err for err in errors)
 
 
-def test_rejects_invalid_audience_count(valid_brief_data):
-    """Brief must contain exactly 6 audiences."""
+def test_supports_custom_audience_and_output_quantities(valid_brief_data):
+    """Brief dynamically supports arbitrary audience counts and output quantities."""
     data = copy.deepcopy(valid_brief_data)
-    data["audiences"].pop()  # now 5 audiences
+    # Duplicate audiences to create 12 audiences
+    extra_audiences = []
+    for idx, aud in enumerate(data["audiences"]):
+        aud_copy = copy.deepcopy(aud)
+        aud_copy["id"] = f"P{idx+7:02d}"
+        aud_copy["name"] = f"Extended Audience {idx+7}"
+        extra_audiences.append(aud_copy)
+    data["audiences"].extend(extra_audiences)  # 12 audiences
+    data["generation"]["totalAudienceGroups"] = 12
+    data["generation"]["totalOutputsPerRun"] = 36  # 12 * 3 = 36
+
+    is_valid, model, errors = validate_brief_dict(data)
+    assert is_valid is True, f"Validation failed: {errors}"
+    assert len(model.audiences) == 12
+    assert model.generation.totalOutputsPerRun == 36
+
+
+def test_rejects_empty_audiences(valid_brief_data):
+    """Brief must contain at least 1 audience."""
+    data = copy.deepcopy(valid_brief_data)
+    data["audiences"] = []
 
     is_valid, model, errors = validate_brief_dict(data)
     assert is_valid is False
-    assert any("at least 6 items" in err or "exactly 6 audiences" in err for err in errors)
+    assert any("at least 1 item" in err.lower() or "audiences" in err.lower() for err in errors)
 
 
-def test_rejects_missing_output_format(valid_brief_data):
-    """Brief must contain exactly the 3 required formats (1:1, 16:9, 9:16)."""
+def test_rejects_unsupported_aspect_ratio(valid_brief_data):
+    """Unsupported aspect ratio is rejected."""
     data = copy.deepcopy(valid_brief_data)
     data["outputFormats"] = [
-        {"id": "square", "aspectRatio": "1:1", "width": 1080, "height": 1080, "filenameTag": "1x1"}
+        {"id": "banner", "aspectRatio": "3:1", "width": 1200, "height": 400, "filenameTag": "3x1"}
     ]
 
     is_valid, model, errors = validate_brief_dict(data)
     assert is_valid is False
-    assert any("at least 3 items" in err or "exactly the three standard formats" in err for err in errors)
+    assert any("unsupported aspect ratio" in err.lower() or "input should be" in err.lower() for err in errors)
+
 
 
 def test_rejects_absolute_paths(valid_brief_data):

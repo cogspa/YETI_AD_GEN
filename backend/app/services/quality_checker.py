@@ -91,12 +91,14 @@ class QualityChecker:
         warnings: List[str] = []
 
         # ---------------------------------------------------------
-        # BLOCKING CHECK 1: Exactly 6 concepts and 18 outputs
+        # BLOCKING CHECK 1: Exact Concept & Output Quantities based on Brief
         # ---------------------------------------------------------
+        expected_concepts = len(brief.audiences) * (brief.generation.conceptsPerAudience or 1)
+        expected_outputs = len(brief.audiences) * len(brief.outputFormats) * (brief.generation.conceptsPerAudience or 1)
         c_count = len(concepts)
         a_count = len(ads)
-        count_passed = (c_count == 6 and a_count == 18)
-        msg = f"Generated {c_count} concepts and {a_count} ad outputs (Expected: 6 concepts, 18 outputs)."
+        count_passed = (c_count == expected_concepts and a_count == expected_outputs)
+        msg = f"Generated {c_count} concepts and {a_count} ad outputs (Expected: {expected_concepts} concepts, {expected_outputs} outputs based on brief)."
         if not count_passed:
             errors.append(msg)
         checks.append(CheckResult(
@@ -105,7 +107,7 @@ class QualityChecker:
             category="blocking",
             passed=count_passed,
             details=msg,
-            metrics={"concepts": c_count, "outputs": a_count, "expected_concepts": 6, "expected_outputs": 18}
+            metrics={"concepts": c_count, "outputs": a_count, "expected_concepts": expected_concepts, "expected_outputs": expected_outputs}
         ))
 
         # ---------------------------------------------------------
@@ -120,7 +122,7 @@ class QualityChecker:
                 dim_passed = False
                 dim_mismatches.append(f"{ad.filename}: {actual} != {expected}")
         
-        dim_msg = "All 18 ads have exact pixel dimensions (1080x1080, 1920x1080, 1080x1920)." if dim_passed else f"Dimension mismatches: {', '.join(dim_mismatches)}"
+        dim_msg = f"All {len(ads)} ads have exact pixel dimensions (1080x1080, 1920x1080, 1080x1920)." if dim_passed else f"Dimension mismatches: {', '.join(dim_mismatches)}"
         if not dim_passed:
             errors.append(dim_msg)
         checks.append(CheckResult(
@@ -131,6 +133,7 @@ class QualityChecker:
             details=dim_msg,
             metrics={"mismatches": dim_mismatches}
         ))
+
 
         # ---------------------------------------------------------
         # BLOCKING CHECK 3: Source Asset SHA-256 Hash Matching

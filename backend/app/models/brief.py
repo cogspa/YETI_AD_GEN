@@ -85,24 +85,24 @@ class RepeatProtection(BaseModel):
 class GenerationSettings(BaseModel):
     mode: str = "seeded-random"
     seed: Optional[int] = None
-    conceptsPerAudience: int = Field(default=1, ge=1, le=1)
-    totalAudienceGroups: int = Field(default=6, ge=6, le=6)
-    adsPerAudience: int = Field(default=3, ge=3, le=3)
-    totalOutputsPerRun: int = Field(default=18, ge=18, le=18)
+    conceptsPerAudience: int = Field(default=1, ge=1)
+    totalAudienceGroups: Optional[int] = Field(default=None, ge=1)
+    adsPerAudience: Optional[int] = Field(default=None, ge=1)
+    totalOutputsPerRun: Optional[int] = Field(default=None, ge=1)
     randomizeOncePerAudience: bool = True
     renderAllFormatsFromSameConcept: bool = True
     selectionRules: Optional[Dict[str, str]] = None
     repeatProtection: Optional[RepeatProtection] = Field(default_factory=RepeatProtection)
 
-
     @model_validator(mode="after")
-    def validate_exact_quantities(self):
-        expected_total = self.totalAudienceGroups * self.adsPerAudience
-        if self.totalOutputsPerRun != expected_total:
-            raise ValueError(
-                f"totalOutputsPerRun ({self.totalOutputsPerRun}) does not match totalAudienceGroups ({self.totalAudienceGroups}) × adsPerAudience ({self.adsPerAudience}) = {expected_total}."
-            )
+    def validate_quantities(self):
+        if self.totalAudienceGroups and self.adsPerAudience and self.totalOutputsPerRun:
+            expected_total = self.totalAudienceGroups * self.adsPerAudience
+            if self.totalOutputsPerRun != expected_total:
+                # Synchronize if mismatch
+                self.totalOutputsPerRun = expected_total
         return self
+
 
 
 class ProductAsset(BaseModel):
@@ -167,8 +167,9 @@ class TaglinePool(BaseModel):
 
 
 class Audience(BaseModel):
-    id: str = Field(pattern=r"^P0[1-6]$")
+    id: str = Field(min_length=1)
     name: str = Field(min_length=1)
+
     age: AudienceAgeRange
     lifeStage: str
     activity: Literal["tailgating", "beach", "camping"]
@@ -267,8 +268,8 @@ class CampaignBriefModel(BaseModel):
     taglineAssets: Dict[str, TaglineAsset]
     backgroundPools: List[BackgroundPool]
     taglinePools: List[TaglinePool]
-    audiences: List[Audience] = Field(min_length=6, max_length=6)
-    outputFormats: List[OutputFormat] = Field(min_length=3, max_length=3)
+    audiences: List[Audience] = Field(min_length=1)
+    outputFormats: List[OutputFormat] = Field(min_length=1)
     composition: Composition
     integrations: Integrations = Integrations()
     qualityChecks: Optional[List[str]] = None
@@ -283,28 +284,30 @@ class CampaignBriefModel(BaseModel):
 
     @model_validator(mode="after")
     def validate_campaign_integrity(self):
-        # 1. Verify exactly 6 unique audiences P01 - P06
+        # 1. Verify unique audience IDs
         audience_ids = [a.id for a in self.audiences]
-        expected_ids = {"P01", "P02", "P03", "P04", "P05", "P06"}
-        if set(audience_ids) != expected_ids or len(self.audiences) != 6:
+        if len(audience_ids) != len(set(audience_ids)):
             raise ValueError(
-                f"Brief must declare exactly 6 audiences matching P01–P06. Found: {audience_ids}"
+                f"Audience IDs must be unique. Found duplicates in: {audience_ids}"
             )
 
-        # 2. Verify exactly 3 output formats: 1:1, 16:9, 9:16
-        format_ratios = {f.aspectRatio for f in self.outputFormats}
-        expected_ratios = {"1:1", "16:9", "9:16"}
-        if format_ratios != expected_ratios:
-            raise ValueError(
-                f"Brief must declare exactly the three standard formats (1:1, 16:9, 9:16). Found: {format_ratios}"
-            )
+        # 2. Verify output formats have valid aspect ratios
+        valid_ratios = {"1:1", "16:9", "9:16"}
+        for fmt in self.outputFormats:
+            if fmt.aspectRatio not in valid_ratios:
+                raise ValueError(
+                    f"Output format '{fmt.id}' has unsupported aspect ratio '{fmt.aspectRatio}'. Supported: {valid_ratios}"
+                )
 
-        # 3. Verify total outputs calculation
-        expected_total = len(self.audiences) * len(self.outputFormats)
-        if self.generation.totalOutputsPerRun != expected_total:
-            raise ValueError(
-                f"Generation outputs calculation mismatch: {len(self.audiences)} audiences × {len(self.outputFormats)} formats = {expected_total}, but generation.totalOutputsPerRun is {self.generation.totalOutputsPerRun}."
-            )
+        # 3. Synchronize total outputs calculation
+        expected_total = len(self.audiences) * len(self.outputFormats) * self.generation.conceptsPerAudience
+        if self.generation.totalOutputsPerRun is None or self.generation.totalOutputsPerRun != expected_total:
+            self.generation.totalOutputsPerRun = expected_total
+        if self.generation.totalAudienceGroups is None:
+            self.generation.totalAudienceGroups = len(self.audiences)
+        if self.generation.adsPerAudience is None:
+            self.generation.adsPerAudience = len(self.outputFormats) * self.generation.conceptsPerAudience
+
 
         # 4. Verify all backgroundPoolIds and taglinePoolIds exist
         bg_pool_ids = {p.id for p in self.backgroundPools}

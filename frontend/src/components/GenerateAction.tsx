@@ -23,13 +23,14 @@ export const GenerateAction: React.FC<GenerateActionProps> = ({
         aria-describedby="generate-subtext"
       >
         <span className="btn-generate-main">
-          {isGenerating ? 'GENERATING 18 ADS...' : `GENERATE ${totalOutputs} ADS`}
+          {isGenerating ? `GENERATING ${totalOutputs} ADS...` : `GENERATE ${totalOutputs} ADS`}
         </span>
         <span id="generate-subtext" className="btn-generate-sub">
-          Six concepts adapted to three formats (1:1, 16:9, 9:16)
+          Deterministic multi-format adaptation ({totalOutputs} total outputs)
         </span>
       </button>
     </section>
+
   );
 };
 

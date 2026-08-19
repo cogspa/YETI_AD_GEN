@@ -29,11 +29,12 @@ export const ContactSheetModal: React.FC<ContactSheetModalProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ color: '#00D2FF', fontFamily: 'var(--font-mono)', fontWeight: 'bold', letterSpacing: '0.1em' }}>YETI</span>
-              <h2 style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '800' }}>Campaign Contact Sheet (18 Ads)</h2>
+              <h2 style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '800' }}>Campaign Contact Sheet</h2>
             </div>
             <p style={{ color: '#7E93A7', fontSize: '11px', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
-              {campaignName} | Run: {runId} | 6 Audiences × 3 Ratios (1:1, 16:9, 9:16)
+              {campaignName} | Run: {runId} | Master Multi-Format Overview
             </p>
+
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
