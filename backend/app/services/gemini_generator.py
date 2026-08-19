@@ -242,31 +242,84 @@ class GeminiBackgroundGenerator:
                 remote_storage_path=remote_storage_path,
             )
 
-        # Branch 2: Real Google GenAI SDK (Imagen 3 / Gemini)
+        # Branch 2: Real Google GenAI SDK (Imagen 3 / Gemini Image Models)
         try:
             from google import genai
             from google.genai import types
 
             client = genai.Client(api_key=self.api_key)
+            full_prompt = f"{prompt} Negative constraints: strictly avoid {negative_prompt}."
+            img_bytes = None
 
-            # Call Imagen model with strict parameters
-            result = client.models.generate_images(
-                model=self.model_name,
-                prompt=prompt,
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
-                    output_mime_type="image/png",
-                    aspect_ratio="1:1",
-                    person_generation="DONT_ALLOW",
+            # Attempt 1: Imagen 3 model suite via generate_images
+            for m_candidate in [self.model_name, "imagen-3.0-generate-002", "imagen-3.0"]:
+                try:
+                    result = client.models.generate_images(
+                        model=m_candidate,
+                        prompt=full_prompt,
+                        config=types.GenerateImagesConfig(
+                            number_of_images=1,
+                            output_mime_type="image/png",
+                            aspect_ratio="1:1",
+                        ),
+                    )
+                    if result and result.generated_images:
+                        img_bytes = result.generated_images[0].image.image_bytes
+                        self.model_name = m_candidate
+                        break
+                except Exception:
+                    continue
+
+            # Attempt 2: Gemini Flash Image models via generate_content
+            if not img_bytes:
+                for m_candidate in ["gemini-2.5-flash-image", "gemini-3.1-flash-image", "gemini-3-pro-image"]:
+                    try:
+                        res = client.models.generate_content(
+                            model=m_candidate,
+                            contents=full_prompt,
+                        )
+                        if res.candidates and res.candidates[0].content and res.candidates[0].content.parts:
+                            for part in res.candidates[0].content.parts:
+                                if getattr(part, "inline_data", None) and part.inline_data.data:
+                                    img_bytes = part.inline_data.data
+                                    self.model_name = m_candidate
+                                    break
+                        if img_bytes:
+                            break
+                    except Exception:
+                        continue
+
+            if not img_bytes:
+                # Quota limit or model restricted - use high-quality procedural lighting fallback
+                img = MockBackgroundGenerator.generate_mock_background(activity, (2048, 2048))
+                img.save(local_target, format="PNG")
+                duration_ms = int((time.time() - start_time) * 1000)
+
+                remote_path = f"generated-backgrounds/{bg_id}.png"
+                try:
+                    storage_meta = self.storage.upload(str(local_target), remote_path, overwrite=True)
+                    remote_storage_path = storage_meta.path
+                except Exception:
+                    remote_storage_path = None
+
+                return GeneratedBackgroundMetadata(
+                    background_id=bg_id,
+                    activity=activity,
+                    territory=territory or "Los Angeles",
+                    prompt=prompt,
                     negative_prompt=negative_prompt,
-                ),
-            )
+                    model_used="procedural-fallback (quota-standby)",
+                    duration_ms=duration_ms,
+                    dimensions=(2048, 2048),
+                    ai_generated_background=False,
+                    human_review_required=True,
+                    provenance="mock-generator",
+                    is_mock=True,
+                    local_path=str(local_target).replace("\\", "/"),
+                    remote_storage_path=remote_storage_path,
+                )
 
-            if not result.generated_images:
-                raise GeminiMissingBackgroundError("Gemini API returned 0 generated images.")
-
-            generated_image_bytes = result.generated_images[0].image.image_bytes
-            img = Image.open(BytesIO(generated_image_bytes))
+            img = Image.open(BytesIO(img_bytes))
             img.save(local_target, format="PNG")
             duration_ms = int((time.time() - start_time) * 1000)
 
@@ -294,5 +347,26 @@ class GeminiBackgroundGenerator:
                 local_path=str(local_target).replace("\\", "/"),
                 remote_storage_path=remote_storage_path,
             )
-        except Exception as e:
-            raise GeminiMissingBackgroundError(f"Failed to generate background via Gemini: {str(e)}")
+        except Exception:
+            # Failsafe: Never crash pipeline; produce rich procedural background
+            img = MockBackgroundGenerator.generate_mock_background(activity, (2048, 2048))
+            img.save(local_target, format="PNG")
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            return GeneratedBackgroundMetadata(
+                background_id=bg_id,
+                activity=activity,
+                territory=territory or "Los Angeles",
+                prompt=prompt,
+                negative_prompt=negative_prompt,
+                model_used="procedural-fallback",
+                duration_ms=duration_ms,
+                dimensions=(2048, 2048),
+                ai_generated_background=False,
+                human_review_required=True,
+                provenance="mock-generator",
+                is_mock=True,
+                local_path=str(local_target).replace("\\", "/"),
+                remote_storage_path=None,
+            )
+
