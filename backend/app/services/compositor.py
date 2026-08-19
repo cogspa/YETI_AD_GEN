@@ -3,13 +3,26 @@
 import os
 from typing import Optional, Union, Tuple, List, Literal
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps, ImageStat
 
 from backend.app.models.layout import (
     RatioLayoutConfig,
     NormalizedRegion,
     LAYOUT_CONFIGS,
 )
+
+
+def is_white_logo(img: Image.Image) -> bool:
+    """Determine if a logo asset is predominantly white/light in color."""
+    try:
+        rgba = img.convert("RGBA")
+        r, _, _, a = rgba.split()
+        mask = a.point(lambda p: 255 if p > 30 else 0)
+        stat_r = ImageStat.Stat(r, mask=mask)
+        return bool(stat_r.count[0] > 0 and stat_r.mean[0] > 180)
+    except Exception:
+        return False
+
 
 
 def cover_crop_background(
@@ -279,14 +292,18 @@ class AdCompositor:
         aspect_ratio: Literal["1:1", "16:9", "9:16"] = "1:1",
         tagline_color_hex: str = "#000000",
         draw_debug_overlay: bool = False,
+        product_gradient_path: Optional[str] = "assets/gradients/#grad1.png",
+        logo_gradient_path: Optional[str] = "assets/gradients/#grad2.png",
     ) -> Image.Image:
         """
         Render a finished ad in the requested aspect ratio following strict layer ordering:
         1. selectedBackground
-        2. optional productShadow
-        3. selectedProductAsset
-        4. selectedTaglineAsset
-        5. selectedBrandLogo
+        2. top gradient (#grad2.png) if white logo
+        3. product gradient (#grad1.png)
+        4. optional productShadow
+        5. selectedProductAsset
+        6. selectedTaglineAsset
+        7. selectedBrandLogo
         """
         layout = LAYOUT_CONFIGS.get(aspect_ratio)
         if not layout:
@@ -302,7 +319,22 @@ class AdCompositor:
             focal_point=layout.background_focal_point,
         )
 
-        # 2. Product Sizing and Position
+        # 2. Top Gradient for White Logo (#grad2.png)
+        if logo_gradient_path and os.path.exists(logo_gradient_path):
+            if is_white_logo(logo_img):
+                try:
+                    with Image.open(logo_gradient_path) as g2_raw:
+                        g2_rgba = g2_raw.convert("RGBA")
+                        g2_w = W
+                        g2_h = int(g2_rgba.height * (W / g2_rgba.width))
+                        g2_scaled = g2_rgba.resize((g2_w, g2_h), Image.Resampling.LANCZOS)
+                        g2_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                        g2_layer.paste(g2_scaled, (0, 0), g2_scaled)
+                        canvas = Image.alpha_composite(canvas, g2_layer)
+                except Exception:
+                    pass
+
+        # 3. Product Sizing and Position
         max_prod_w = int(layout.product_region.max_width_pct * W)
         max_prod_h = int(layout.product_region.max_height_pct * H)
         scaled_prod, prod_w, prod_h = fit_within_region(product_img, max_prod_w, max_prod_h)
@@ -310,7 +342,23 @@ class AdCompositor:
             layout.product_region, prod_w, prod_h, W, H
         )
 
-        # 3. Product Shadow
+        # 4. Product Glow Gradient (#grad1.png)
+        if product_gradient_path and os.path.exists(product_gradient_path):
+            try:
+                with Image.open(product_gradient_path) as g1_raw:
+                    g1_rgba = g1_raw.convert("RGBA")
+                    g1_w = int(prod_w * 1.45)
+                    g1_h = int(prod_h * 1.45)
+                    g1_scaled = g1_rgba.resize((g1_w, g1_h), Image.Resampling.LANCZOS)
+                    g1_x = prod_x + (prod_w - g1_w) // 2
+                    g1_y = prod_y + (prod_h - g1_h) // 2
+                    g1_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                    g1_layer.paste(g1_scaled, (g1_x, g1_y), g1_scaled)
+                    canvas = Image.alpha_composite(canvas, g1_layer)
+            except Exception:
+                pass
+
+        # 5. Product Shadow
         if layout.shadow.enabled:
             shadow_layer = render_contact_shadow(
                 W, H, prod_x, prod_y, prod_w, prod_h,
@@ -319,10 +367,11 @@ class AdCompositor:
             )
             canvas = Image.alpha_composite(canvas, shadow_layer)
 
-        # 4. Product Composite
+        # 6. Product Composite
         # Ensure product is RGBA
         prod_rgba = scaled_prod.convert("RGBA")
         canvas.paste(prod_rgba, (prod_x, prod_y), prod_rgba)
+
 
         # 5. Tagline Layer (Image Overlay or Programmatic Text)
         max_tag_w = int(layout.tagline_region.max_width_pct * W)

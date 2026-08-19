@@ -45,9 +45,12 @@
     "brand-logo": "assets/brand/Yeti_Logo_1.png",
     "brand-logo-black": "assets/brand/Yeti_Logo_1.png",
     "brand-logo-white": "assets/brand/Yeti_Logo_4.png",
+    "gradient-product": "assets/gradients/#grad1.png",
+    "gradient-logo-white": "assets/gradients/#grad2.png",
     "font-bold": "assets/fonts/DejaVuSans-Bold.ttf",
     "font-regular": "assets/fonts/DejaVuSans.ttf"
   },
+
   "layoutReference": {
     "square": "ad_examples/1_1.png",
     "landscape": "ad_examples/16_9.png",
