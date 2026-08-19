@@ -326,6 +326,18 @@ No live API keys, Dropbox tokens, or credentials are required to run the full pi
 
 To generate a full 18-ad campaign using approved canonical assets:
 
+### Via Standalone Terminal CLI:
+```bash
+# 1. Activate your virtual environment
+source .venv/bin/activate
+
+# 2. Run with the default campaign brief & seed 42
+python generate_ads.py
+
+# 3. Or specify custom briefs, seeds, and output folders
+python generate_ads.py --brief yeti_la_random_ad_campaign.json --seed 1234 --output-dir ./outputs
+```
+
 ### Via Web UI:
 1. Open `http://localhost:5173`.
 2. The default brief (`yeti-la-go-anywhere-2026.json`) loads automatically.
@@ -339,6 +351,7 @@ curl -X POST "http://localhost:8000/api/campaign/generate?seed=42" \
      -H "Content-Type: application/json" \
      -d @yeti_la_random_ad_campaign.json
 ```
+
 
 ---
 

@@ -18,6 +18,8 @@ The repository was verified for fresh-clone usability without external dependenc
 | **Node Dependencies** | `npm --prefix frontend install` | ✅ Clean React 19 + TypeScript installation |
 | **Backend Server** | `uvicorn backend.app.main:app --port 8000 --host 0.0.0.0` | ✅ FastAPI running and listening on port 8000 |
 | **Frontend Server** | `npm run --prefix frontend dev -- --port 5173` | ✅ Vite dev server running on port 5173 |
+| **Standalone CLI Run** | `python generate_ads.py --seed 42` | ✅ Full 18-ad pipeline execution from terminal in ~20s |
+
 
 ---
 
