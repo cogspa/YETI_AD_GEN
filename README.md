@@ -28,13 +28,75 @@ The campaign demonstrates more than the creation of individual YETI advertisemen
 
 ---
 
+## ⚡ Quickstart: Command Line Execution (CLI)
+
+The campaign generation engine can be run directly from the terminal with a single command:
+
+```bash
+# 1. Activate the Python virtual environment
+source .venv/bin/activate
+
+# 2. Run the 18-Ad baseline campaign with deterministic seed
+python generate_ads.py --brief yeti_la_random_ad_campaign.json --seed 42
+
+# 3. Run the 36-Ad campaign (2 concepts per audience)
+python generate_ads.py --brief yeti_la_random_ad_campaign_36.json --seed 42
+
+# 4. Run the 72-Ad multi-demographic campaign (includes Google Gemini AI scenes)
+python generate_ads.py --brief yeti_la_random_ad_campaign_72.json --seed 42
+```
+
+### CLI Output Summary:
+Upon execution, the terminal displays live stage progress, validates assets, renders all multi-format PNG adaptations into `outputs/yeti-la-go-anywhere-2026/runs/`, compiles a master visual contact sheet, runs 8 blocking quality checks, and generates a structured compliance report (`generation-report.json`).
+
+---
+
+## 🖥️ Interactive Web UI Control Center
+
+In addition to the command-line interface, a **full interactive web application** has been developed for creative directors, campaign managers, and marketing teams.
+
+### Tech Stack:
+- **Frontend**: **TypeScript**, **React 19**, **Vite**, and **Vanilla CSS** (dark mode, glassmorphic styling, responsive layout).
+- **Backend API**: **Python (FastAPI / Flask-compatible WSGI/ASGI service)** with **Pillow (PIL)** for composite image rendering and the **Google GenAI SDK** for AI scene synthesis.
+
+### Web UI Features & Architecture:
+1. **Live JSON Brief Editor & Schema Validator**:
+   - Ingests, inspects, and validates campaign brief JSON files directly in the browser with real-time error feedback and syntax highlighting.
+2. **Dynamic Audience & Matrix Equation**:
+   - Computes planned output counts dynamically based on loaded personas ($N \text{ audiences} \times M \text{ concepts} \times 3 \text{ formats} = \text{Target Ads}$).
+   - Features collapsible accordion sections for cleaner workspace views.
+3. **Asset Readiness & Integrity Monitor**:
+   - Continuously verifies canonical brand assets on disk and cloud storage (checking presence, format, transparency, and non-zero byte size).
+4. **System & AI Integrations Dashboard**:
+   - Displays live connection health for Dropbox Cloud Storage and Google Gemini AI scene generation (active vs standby).
+5. **Real-Time Generation Progress Modal**:
+   - Visualizes live multi-step pipeline execution (JSON validation, asset resolution, repeat protection, concept selection, rendering, QA verification, storage sync).
+6. **Campaign Results Gallery & Lightbox**:
+   - Filterable ad cards grouped by audience demographic with instant format tabs (`1:1`, `16:9`, `9:16`).
+   - High-resolution Lightbox inspection, Master Contact Sheet viewer, ZIP bundle download, and one-click **"Open in Dropbox Folder"** web integration.
+
+### Launching the Web UI:
+
+```bash
+# Terminal 1: Start the Python Backend API (Port 8000)
+source .venv/bin/activate
+uvicorn backend.app.main:app --port 8000 --host 0.0.0.0 --reload
+
+# Terminal 2: Start the TypeScript / React Frontend (Port 5173)
+npm run dev -- --port 5173
+```
+*Open **`http://localhost:5173`** in your browser.*
+
+---
+
 # YETI Los Angeles Multi-Format Creative Ad Generator (2026)
 
 A deterministic, high-throughput creative advertising adaptation engine for YETI’s **"Go Anywhere with YETI"** Los Angeles campaign. Built with **FastAPI**, **Pillow (PIL)**, **React 19**, **TypeScript**, and **Vanilla CSS**.
 
-Generates **18 deterministic, brand-compliant creative ad adaptations** across **6 audience segments** and **3 industry-standard aspect ratios** (`1:1` Square, `16:9` Landscape, `9:16` Vertical Story) with pixel-perfect composition, typography hierarchy, and controlled asset locking.
+Generates **18 to 72 deterministic, brand-compliant creative ad adaptations** across **6 to 12 audience segments** and **3 industry-standard aspect ratios** (`1:1` Square, `16:9` Landscape, `9:16` Vertical Story) with pixel-perfect composition, typography hierarchy, and controlled asset locking.
 
 ---
+
 
 
 ## Table of Contents
