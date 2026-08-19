@@ -104,20 +104,20 @@ Generates **18 to 72 deterministic, brand-compliant creative ad adaptations** ac
 2. [Generator UI Interface](#2-generator-ui-interface)
 3. [Three Sample-Ad Layout References](#3-three-sample-ad-layout-references)
 4. [Architecture Overview](#4-architecture-overview)
-5. [Why 6 Concepts Become 18 Outputs](#5-why-6-concepts-become-18-outputs)
-6. [Campaign Rules Matrix](#6-campaign-rules-matrix)
+5. [Initial 18-Ad Baseline vs. Expanded 72-Ad Gemini Multi-Demographic Campaign](#5-initial-18-ad-baseline-vs-expanded-72-ad-gemini-multi-demographic-campaign)
+6. [Campaign Rules Matrix & Demographic Expansion](#6-campaign-rules-matrix--demographic-expansion)
 7. [Asset Tree & Placeholder Resolver](#7-asset-tree--placeholder-resolver)
 8. [JSON Brief Validation Rules](#8-json-brief-validation-rules)
 9. [Current & Previous-Run Repeat Protection](#9-current--previous-run-repeat-protection)
 10. [Same-Concept Ratio Adaptation](#10-same-concept-ratio-adaptation)
 11. [Dropbox Cloud Storage & Configuration](#11-dropbox-cloud-storage--configuration)
-12. [Gemini's Missing-Background-Only Role](#12-geminis-missing-background-only-role)
+12. [Google Gemini AI Scene Generation & Fallback Architecture](#12-google-gemini-ai-scene-generation--fallback-architecture)
 13. [Controlled Assets & Human Review Governance](#13-controlled-assets--human-review-governance)
 14. [Prerequisites & Fresh-Clone Setup](#14-prerequisites--fresh-clone-setup)
 15. [Secret-Free Environment Configuration](#15-secret-free-environment-configuration)
-16. [Running with Approved Assets (Zero Gemini Calls)](#16-running-with-approved-assets-zero-gemini-calls)
-17. [Testing the AI Background Fallback Path](#17-testing-the-ai-background-fallback-path)
-18. [Automated Test Suite (49 Backend / 3 Frontend)](#18-automated-test-suite-49-backend--3-frontend)
+16. [Running with Approved Assets & Baseline 18-Ad Runs](#16-running-with-approved-assets--baseline-18-ad-runs)
+17. [Running the Expanded 72-Ad Gemini AI Campaign](#17-running-the-expanded-72-ad-gemini-ai-campaign)
+18. [Automated Test Suite (50 Backend / 3 Frontend)](#18-automated-test-suite-50-backend--3-frontend)
 19. [Output Directory Structure](#19-output-directory-structure)
 20. [Architectural Decisions & Tradeoffs](#20-architectural-decisions--tradeoffs)
 21. [System Assumptions & Honest Limitations](#21-system-assumptions--honest-limitations)
@@ -134,7 +134,8 @@ The **YETI Ad Generator** automates this workflow deterministically:
 - Ingests structured JSON campaign briefs describing target audiences, regional activities, and creative constraints.
 - Resolves and verifies canonical brand assets (logos, products, approved background scenes, official vector taglines).
 - Applies deterministic seeded randomization to select scenes and taglines while enforcing strict demographic targeting rules.
-- Renders 18 pixel-perfect composite advertisements with custom typographic hierarchy and ratio-specific layout adjustments.
+- **Scales from Baseline to Expanded Campaigns**: Evaluated initially on an **18-ad baseline test** (6 audience segments × 3 aspect ratios), then expanded and proven on a **72-ad campaign brief** (12 audience segments) to test and enable **automated AI scene generation with Google Gemini** for new outdoor demographics not present in the initial brief.
+- Renders pixel-perfect composite advertisements across `1:1`, `16:9`, and `9:16` formats with ratio-specific layout adjustments.
 - Runs 8 automated blocking quality checks, builds a master contact sheet, generates compliance reports, and uploads artifacts to cloud storage.
 
 ---
@@ -143,11 +144,11 @@ The **YETI Ad Generator** automates this workflow deterministically:
 
 The frontend application provides a live control center for creative operations:
 - **Campaign Brief Upload & Editor**: Ingests brief JSON files, performs schema and rule validation, and allows in-browser JSON inspection and editing.
-- **Audience & Format Formula**: Visually presents the 6 audiences × 3 formats = 18 outputs calculation with age group distributions.
+- **Dynamic Audience & Format Formula**: Automatically computes matrix output calculations ($N \text{ audiences} \times M \text{ concepts} \times 3 \text{ formats} = \text{Target Ads}$) with age group distributions and collapsible sections.
 - **Asset Readiness Dashboard**: Inspects local and cloud asset health, verifies SHA-256 hashes, and displays readiness badges.
-- **Storage Status Indicator**: Displays active storage mode (Local Filesystem or Dropbox Cloud App Folder).
+- **Storage & AI Status Indicators**: Displays active storage mode (Local Filesystem or Dropbox Cloud App Folder) and Google Gemini AI scene generation readiness.
 - **Interactive Generation Modal**: Visualizes real-time pipeline stages (JSON validation, asset resolution, concept selection, rendering, QA verification, storage upload).
-- **Campaign Results Center**: Filterable cards grouped by audience with format tabs, full-resolution Lightbox preview, 6×3 Master Contact Sheet viewer, ZIP bundle download, and Compliance Quality Report.
+- **Campaign Results Center**: Filterable cards grouped by audience with format tabs, full-resolution Lightbox preview, Master Contact Sheet viewer, ZIP bundle download, and Compliance Quality Report.
 
 ---
 
@@ -203,16 +204,16 @@ flowchart TD
     B -->|Schema / Rule Error| ERR[Reject with Line Diagnostics]
     
     C -->|Local Files / Cloud Cache| D[Concept Planner]
-    D -->|Seed + Prior Manifest| E[6 Deterministic Audience Concepts]
+    D -->|Seed + Prior Manifest| E[Deterministic Audience Concepts]
     
-    E --> F{Missing Background?}
-    F -->|No: Canonical Exists| G[Approved Asset Bypass]
-    F -->|Yes: Missing File| H[Gemini AI Scene Fallback]
+    E --> F{Missing Background / New Demographic?}
+    F -->|Canonical Asset Exists| G[Approved Asset Bypass]
+    F -->|Unpopulated Pool / Missing File| H[Google Gemini Generative AI Scene Engine]
     
     G --> I[PIL Ad Compositor]
     H --> I
     
-    I -->|18 Render Plans| J[18 High-Res PNG Ad Compositions]
+    I -->|Multi-Format Render Plans| J[High-Res PNG Ad Compositions 1:1, 16:9, 9:16]
     J --> K[Contact Sheet Generator]
     J --> L[Deterministic Quality Checker]
     
@@ -224,32 +225,52 @@ flowchart TD
     J --> O
     
     O -->|Configured| P[Dropbox App Folder Upload]
-    O -->|Fallback| Q[Local outputs/ Directory]
+    O -->|Local| Q[Local outputs/ Directory]
 ```
 
 ---
 
-## 5. Why 6 Concepts Become 18 Outputs
+## 5. Initial 18-Ad Baseline vs. Expanded 72-Ad Gemini Multi-Demographic Campaign
 
 A core brand governance rule of this engine is **Cross-Format Concept Locking**:
-- The campaign brief defines **6 distinct audience groups** (3 Younger segments ≤ 24 years old, 3 Older segments ≥ 25 years old).
-- The `ConceptPlanner` executes deterministic randomization **once per audience** (not per aspect ratio). This selects a single coherent creative concept: `(Audience + Activity + Scene Background + Product Packshot + Tagline)`.
+- The `ConceptPlanner` executes deterministic randomization **once per audience concept** (not per aspect ratio). This selects a single coherent creative concept: `(Audience + Activity + Scene Background + Product Packshot + Tagline)`.
 - The `AdCompositor` then adapts that **single concept** into the 3 required aspect ratios (`1:1`, `16:9`, `9:16`).
-- Result: **6 Concepts × 3 Formats = Exactly 18 Output Advertisements**.
 - **Why this matters**: A consumer seeing a YETI ad on Instagram Stories (`9:16`), Instagram Feed (`1:1`), and YouTube (`16:9`) experiences identical product color, background environment, and messaging without fragmentation.
+
+### 1. Initial 18-Ad Baseline (Testing & Validation Phase):
+The project was initially scaffolded and validated using a baseline brief (`yeti-la-go-anywhere-2026.json`):
+- **6 Audience Segments** (3 Younger segments $\le 24$ years old, 3 Older segments $\ge 25$ years old)
+- **1 Concept per Audience** $\times$ **3 Formats** = **Exactly 18 Output Advertisements**
+- Validated core compositing math, typography hierarchy, safe zones, and static pre-approved backgrounds (Beach, Tailgate, Camping).
+
+### 2. Expanded 72-Ad Campaign with Google Gemini AI Scene Generation:
+Once the core pipeline was established and Google Gemini was integrated, the generator was expanded to prove scalable, dynamic creative production on [`yeti_la_random_ad_campaign_72.json`](file:///Users/joem/YETI_AD_GEN/yeti_la_random_ad_campaign_72.json):
+- **12 Audience Segments** covering traditional and newly added Los Angeles outdoor lifestyles.
+- **2 Concepts per Audience** $\times$ **3 Formats** = **Exactly 72 Output Advertisements**.
+- **Automated Background Synthesis**: When new demographics introduce activities or territories without static photographic assets in storage (e.g. **Hiking** in Hollywood Hills/Griffith Park, **Surfing** in Malibu/South Bay, **Coastal Fishing** in Marina Del Rey, and **Rock Climbing** at Stoney Point), the engine dynamically calls **Google Gemini Image API** (`gemini-2.5-flash-image` / `imagen-3.0`) to generate commercial, photorealistic, brand-guardrailed landscape photography on the fly.
+- Generated backgrounds are automatically stored with the campaign run, hashed, reused for cross-format consistency, and flagged for human creative review.
 
 ---
 
-## 6. Campaign Rules Matrix
+## 6. Campaign Rules Matrix & Demographic Expansion
 
-| Audience ID | Demographic / Territory | Age Band | Assigned Product | Activity Pool | Tagline Color | YETI Logo Color |
+| Audience ID | Demographic / Territory | Activity Pool | Assigned Product | Background Source | Tagline Color | YETI Logo Color |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| **`P01`** | Gen-Z Beach Goers (Venice / Santa Monica) | Younger (18–24) | **Orange Cooler** (`product_orange.png`) | `beach-west-coast` | **Black** (`#000000`) | **White** (`logo_white.png`) |
-| **`P02`** | UCLA Tailgaters (Westwood) | Younger (18–24) | **Orange Cooler** (`product_orange.png`) | `tailgating-college-westwood` | **White** (`#FFFFFF`) | **White** (`logo_white.png`) |
-| **`P03`** | USC Students (South Central) | Younger (18–24) | **Orange Cooler** (`product_orange.png`) | `tailgating-college-south-central` | **White** (`#FFFFFF`) | **White** (`logo_white.png`) |
-| **`P04`** | Angeles Crest Campers (San Gabriel Mtns) | Older (25–34) | **White Cooler** (`product_white.png`) | `camping-la-mountains` | **White** (`#FFFFFF`) | **White** (`logo_white.png`) |
-| **`P05`** | Malibu Coastal Explorers (Malibu) | Older (35–44) | **White Cooler** (`product_white.png`) | `beach-west-coast` | **Black** (`#000000`) | **White** (`logo_white.png`) |
-| **`P06`** | Topanga Weekend Trekkers (Topanga) | Older (45–54) | **White Cooler** (`product_white.png`) | `camping-la-mountains` | **White** (`#FFFFFF`) | **White** (`logo_white.png`) |
+| **`P01`** | UCLA Tailgaters (Westwood) | Tailgating | **Orange Cooler** (`Roadie 24`) | Approved Asset (`Tailgate.jpg`) | White (`#FFFFFF`) | White (`logo_white.png`) |
+| **`P02`** | USC Students (South Central) | Tailgating | **Orange Cooler** (`Roadie 24`) | Approved Asset (`Tailgate.jpg`) | White (`#FFFFFF`) | White (`logo_white.png`) |
+| **`P03`** | Venice Beach Coastal Goers | Beach | **White Cooler** (`Tundra 45`) | Approved Asset (`Beach.jpg`) | Black (`#000000`) | White (`logo_white.png`) |
+| **`P04`** | Santa Monica Boardwalk | Beach | **Orange Cooler** (`Roadie 24`) | Approved Asset (`Beach.jpg`) | Black (`#000000`) | White (`logo_white.png`) |
+| **`P05`** | Angeles Crest Campers | Camping | **White Cooler** (`Tundra 45`) | Approved Asset (`Camping.jpg`) | White (`#FFFFFF`) | White (`logo_white.png`) |
+| **`P06`** | Topanga Canyon Trekkers | Camping | **White Cooler** (`Tundra 45`) | Approved Asset (`Camping.jpg`) | White (`#FFFFFF`) | White (`logo_white.png`) |
+| **`P07`** *(New)* | Hollywood Hills Trail Hikers | Hiking | **Orange Cooler** (`Roadie 24`) | **Google Gemini AI Scene** | White (`#FFFFFF`) | White (`logo_white.png`) |
+| **`P08`** *(New)* | Griffith Park Ridgeline Trekkers | Hiking | **White Cooler** (`Tundra 45`) | **Google Gemini AI Scene** | White (`#FFFFFF`) | White (`logo_white.png`) |
+| **`P09`** *(New)* | Malibu Point Dawn Surfers | Surfing | **Orange Cooler** (`Roadie 24`) | **Google Gemini AI Scene** | Black (`#000000`) | White (`logo_white.png`) |
+| **`P10`** *(New)* | South Bay Sunset Surfers | Surfing | **White Cooler** (`Tundra 45`) | **Google Gemini AI Scene** | Black (`#000000`) | White (`logo_white.png`) |
+| **`P11`** *(New)* | Marina Del Rey Anglers | Fishing | **Orange Cooler** (`Roadie 24`) | **Google Gemini AI Scene** | White (`#FFFFFF`) | White (`logo_white.png`) |
+| **`P12`** *(New)* | Stoney Point Rock Climbers | Climbing | **White Cooler** (`Tundra 45`) | **Google Gemini AI Scene** | White (`#FFFFFF`) | White (`logo_white.png`) |
+
+---
+
 
 ---
 
@@ -330,12 +351,20 @@ The system features an enterprise Dropbox Storage Adapter (`backend/app/services
 
 ---
 
-## 12. Gemini's Missing-Background-Only Role
+## 12. Google Gemini AI Scene Generation & Fallback Architecture
 
-The Gemini Generative AI integration (`backend/app/services/gemini_generator.py`) serves **exclusively as a bounded fallback** for missing background scenes:
-- **Approved Asset Bypass**: If an approved local or cloud background exists for an audience activity, **Gemini is never invoked**.
-- **Strict Guardrail Prompting**: Prompts enforce outdoor lifestyle landscapes and explicitly prohibit human faces, bodies, logos, coolers, or text overlays.
-- **Mock vs Live Truthfulness**: When `GEMINI_API_KEY` is not provided, a deterministic geometric mock generator creates the fallback background and explicitly labels it `mock_fallback` in metadata. Mock outputs are never falsely labeled as AI-generated.
+The Google Gemini Generative AI integration (`backend/app/services/gemini_generator.py`) serves two core functions in the creative pipeline:
+
+1. **Dynamic Demographic Scene Generation**:
+   - When a campaign brief introduces new outdoor lifestyles or regional territories without pre-existing static assets in storage (e.g. **Hiking** in Griffith Park, **Surfing** in Malibu, **Fishing** in Marina Del Rey, or **Bouldering** at Stoney Point), the engine calls Google's latest image generation model (`gemini-2.5-flash-image` / `imagen-3.0`) to synthesize custom, high-resolution ($1408 \times 768$ to $2048 \times 2048$) commercial lifestyle photography.
+2. **Missing Asset Fallback**:
+   - If an approved background file referenced in a brief is missing from disk or cloud storage, Gemini synthesizes an on-brand replacement on the fly, preventing pipeline crashes.
+3. **Approved Asset Bypass**:
+   - If an approved local or cloud background already exists for an audience pool, Gemini is bypassed entirely to preserve canonical brand photography.
+4. **Strict Guardrail Prompting**:
+   - Generative prompts dynamically build negative constraints to strictly prohibit human faces, bodies, logos, coolers, or text overlays, ensuring clean negative space for compositor packshots.
+5. **Procedural Landscape Fallback**:
+   - If an API key is absent or quota limits apply, a high-resolution atmospheric procedural lighting generator provides an immediate graceful fallback clearly labeled `mock_fallback` in audit metadata.
 
 ---
 
@@ -397,8 +426,10 @@ PORT=8000
 HOST=0.0.0.0
 CORS_ORIGINS=http://localhost:5173
 
-# AI Scene Background Generation (Optional Fallback)
+# AI Scene Background Generation (Optional Fallback / Dynamic Scenes)
 GEMINI_API_KEY=
+GEMINI_IMAGE_MODEL=gemini-2.5-flash-image
+GEMINI_ENABLED=true
 
 # Local Storage Root
 STORAGE_ROOT=./outputs
@@ -415,59 +446,56 @@ No live API keys, Dropbox tokens, or credentials are required to run the full pi
 
 ---
 
-## 16. Running with Approved Assets (Zero Gemini Calls)
+## 16. Running with Approved Assets & Baseline 18-Ad Runs
 
-To generate a full 18-ad campaign using approved canonical assets:
+To generate the baseline 18-ad campaign using approved canonical assets:
 
 ### Via Standalone Terminal CLI:
 ```bash
 # 1. Activate your virtual environment
 source .venv/bin/activate
 
-# 2. Run with the default campaign brief & seed 42
-python generate_ads.py
-
-# 3. Or specify custom briefs, seeds, and output folders
-python generate_ads.py --brief yeti_la_random_ad_campaign.json --seed 1234 --output-dir ./outputs
+# 2. Run with the baseline campaign brief & seed 42
+python generate_ads.py --brief yeti_la_random_ad_campaign.json --seed 42
 ```
 
 ### Via Web UI:
 1. Open `http://localhost:5173`.
-2. The default brief (`yeti-la-go-anywhere-2026.json`) loads automatically.
+2. Select **`yeti_la_random_ad_campaign.json (18 Ads)`** from the brief selector.
 3. Click **`GENERATE 18 ADS`**.
-4. The generation modal tracks all 8 pipeline stages in real time.
-5. Review the 6 audience concepts, download the 18-ad ZIP bundle, inspect the Contact Sheet, or click **`QUALITY REPORT (8/8)`** to view compliance checks.
+4. Review the 6 audience concepts, inspect the Master Contact Sheet, and download the 18-ad ZIP package.
 
-### Via Backend API:
+---
+
+## 17. Running the Expanded 72-Ad Gemini AI Campaign
+
+To generate the full 72-ad expanded campaign featuring 12 audience demographics and automated Gemini AI background scene synthesis:
+
+### Via Standalone Terminal CLI:
 ```bash
-curl -X POST "http://localhost:8000/api/campaign/generate?seed=42" \
-     -H "Content-Type: application/json" \
-     -d @yeti_la_random_ad_campaign.json
+# 1. Activate your virtual environment
+source .venv/bin/activate
+
+# 2. Run the 72-Ad multi-demographic campaign
+python generate_ads.py --brief yeti_la_random_ad_campaign_72.json --seed 42
 ```
 
+### Via Web UI:
+1. Open `http://localhost:5173`.
+2. Select **`yeti_la_random_ad_campaign_72.json (72 Ads - 12 Demographics + Gemini AI)`** from the brief selector.
+3. Click **`GENERATE 72 ADS`**.
+4. The pipeline synthesizes background landscapes for Hiking, Surfing, Fishing, and Climbing, adapts all 24 concepts across 3 aspect ratios ($24 \times 3 = 72$ ads), runs 8 blocking quality checks, compiles a $24 \times 3$ contact sheet, and outputs the final ZIP archive.
 
 ---
 
-## 17. Testing the AI Background Fallback Path
-
-To verify the Gemini fallback mechanism when a background is missing:
-1. In the web UI, click **`INSPECT / EDIT JSON`**.
-2. Modify one background pool entry to reference a non-existent asset:
-   ```json
-   "backgroundPoolId": "missing-joshua-tree-scene.jpg"
-   ```
-3. Click **`GENERATE 18 ADS`**.
-4. The pipeline detects the missing file, invokes the fallback generator, attaches the `human_review_required: true` badge, and logs the provenance in `pipeline.log`.
-
----
-
-## 18. Automated Test Suite (49 Backend / 3 Frontend)
+## 18. Automated Test Suite (50 Backend / 3 Frontend)
 
 Run the full automated test suite with one command:
 
 ```bash
-# 1. Run all 49 Backend Pytest Tests (100% Pass Rate)
+# 1. Run all 50 Backend Pytest Tests (100% Pass Rate)
 PYTHONPATH=. .venv/bin/pytest backend/tests/ -v
+
 
 # 2. Run Frontend Vitest Unit Tests (100% Pass Rate)
 npx --prefix frontend vitest run --dir frontend
@@ -556,7 +584,7 @@ To scale this engine to enterprise multi-brand production:
    ```bash
    PYTHONPATH=. .venv/bin/pytest backend/tests/ -v
    ```
-   *(Verify all 49 tests pass in ~40 seconds).*
+   *(Verify all 50 tests pass in ~40 seconds).*
 3. **Start Application**:
    ```bash
    uvicorn backend.app.main:app --port 8000 &
@@ -564,8 +592,10 @@ To scale this engine to enterprise multi-brand production:
    ```
 4. **Generate Campaign in Browser**:
    - Navigate to `http://localhost:5173`.
-   - Click **`GENERATE 18 ADS`**.
+   - Select **`yeti_la_random_ad_campaign.json (18 Ads)`** or **`yeti_la_random_ad_campaign_72.json (72 Ads - 12 Demographics + Gemini AI)`**.
+   - Click **`GENERATE ADS`**.
 5. **Verify Outputs**:
-   - Click **`VIEW CONTACT SHEET`** to see the 6×3 master review grid.
+   - Click **`VIEW CONTACT SHEET`** to see the master review grid.
    - Click **`QUALITY REPORT (8/8)`** to inspect the deterministic compliance audit.
-   - Download the full 18-ad ZIP package.
+   - Download the full ZIP package or click **`OPEN IN DROPBOX FOLDER`**.
+
