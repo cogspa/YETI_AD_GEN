@@ -43,13 +43,13 @@ describe('YETI Ad Generator UI', () => {
     expect(screen.getByText('P06')).toBeInTheDocument();
     expect(screen.getByText('Graduate Adventure Campers')).toBeInTheDocument();
 
-    // Check Generate button with 18 outputs
-    const generateBtn = screen.getByRole('button', { name: /GENERATE 18 ADS/i });
+    // Check Generate button
+    const generateBtn = screen.getByRole('button', { name: /GENERATE ADS/i });
     expect(generateBtn).toBeInTheDocument();
     expect(generateBtn).not.toBeDisabled();
   });
 
-  it('clicking GENERATE 18 ADS opens progress modal', async () => {
+  it('clicking GENERATE ADS opens progress modal', async () => {
     // Mock API call
     vi.spyOn(api, 'generateCampaignAds').mockResolvedValueOnce({
       run_id: 'run-test-001',
@@ -75,12 +75,13 @@ describe('YETI Ad Generator UI', () => {
 
     render(<App />);
 
-    const generateBtn = screen.getAllByRole('button', { name: /GENERATE 18 ADS/i })[0];
+    const generateBtn = screen.getAllByRole('button', { name: /GENERATE ADS/i })[0];
     fireEvent.click(generateBtn);
 
     // Verify progress modal is opened
     expect(screen.getByText('Generating 18 Ads')).toBeInTheDocument();
   });
+
 
   it('inspect / edit JSON panel expands and displays editable JSON', () => {
     render(<App />);

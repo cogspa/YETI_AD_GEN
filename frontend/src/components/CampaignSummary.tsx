@@ -8,7 +8,8 @@ interface CampaignSummaryProps {
 export const CampaignSummary: React.FC<CampaignSummaryProps> = ({ brief }) => {
   const audiences = brief.audiences || [];
   const formats = brief.outputFormats || [];
-  const totalOutputs = audiences.length * formats.length;
+  const conceptsPerAudience = brief.generation?.conceptsPerAudience || 1;
+  const totalOutputs = brief.generation?.totalOutputsPerRun || (audiences.length * formats.length * conceptsPerAudience);
 
   return (
     <section className="campaign-summary-section" aria-labelledby="summary-heading">
@@ -20,15 +21,22 @@ export const CampaignSummary: React.FC<CampaignSummaryProps> = ({ brief }) => {
         <div className="summary-formula-box">
           <div className="summary-formula-main">
             <span className="formula-part highlight">{audiences.length} audiences</span>
+            {conceptsPerAudience > 1 && (
+              <>
+                <span className="formula-operator">×</span>
+                <span className="formula-part highlight">{conceptsPerAudience} concepts</span>
+              </>
+            )}
             <span className="formula-operator">×</span>
             <span className="formula-part highlight">{formats.length} formats</span>
             <span className="formula-operator">=</span>
             <span className="formula-total">{totalOutputs} outputs</span>
           </div>
           <div className="summary-formula-note">
-            Fixed deterministic workflow • 1 concept per audience adapted across all 3 aspect ratios
+            Fixed deterministic workflow • {conceptsPerAudience} concept{conceptsPerAudience > 1 ? 's' : ''} per audience adapted across all {formats.length} aspect ratios
           </div>
         </div>
+
 
         {/* Aspect Ratio Formats Pills */}
         <div className="formats-strip">
