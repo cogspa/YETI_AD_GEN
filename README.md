@@ -1,3 +1,33 @@
+# Campaign Synopsis: “Go Anywhere with YETI”
+
+“Go Anywhere with YETI” is a Los Angeles–focused advertising campaign designed to promote two YETI cooler products across multiple audiences, locations, product colors, and digital ad formats. The campaign primarily targets young adults, college students, campers, and tailgaters, presenting YETI coolers as durable products that move easily between outdoor recreation and social experiences.
+
+The campaign is supported by a creative-automation pipeline. A user begins by submitting a structured campaign brief containing the products, available colors, audience segments, regional information, approved campaign copy, brand standards, and links to source assets. These inputs can be supplied through a JSON file, spreadsheet, or simple frontend interface.
+
+The system retrieves the approved product photography, logos, fonts, colors, lifestyle backgrounds, and messaging from organized storage. If a required lifestyle or hero image is unavailable, the pipeline can request a new image from a generative-image API using the campaign’s art direction and brand constraints. Generated content is then stored with the campaign assets for review and reuse.
+
+The pipeline builds a variation matrix combining:
+
+- Two YETI cooler products
+- Multiple approved product colors
+- Camping and tailgating environments
+- Audience and demographic variations
+- Los Angeles–specific messaging
+- Square, vertical, and landscape ad formats
+
+For each variation, the system selects the appropriate template, places the product and background imagery, applies the correct product color, inserts the campaign message, and adds approved brand elements. The primary deliverables are produced in three formats: 1:1, 9:16, and 16:9.
+
+Before an ad is approved, it passes through automated quality checks covering logo placement, safe areas, typography, color usage, text contrast, product distortion, image resolution, output dimensions, and required legal copy. Ads that pass are added to the final campaign package. Ads that fail are flagged with a clear reason for human review.
+
+The final output includes the approved ad variations, a visual preview gallery, an asset manifest, and an execution log showing how each image was created. All source materials and deliverables are organized into predictable campaign folders and backed up to shared storage.
+
+The campaign demonstrates more than the creation of individual YETI advertisements. It shows how a repeatable creative-production system can transform one approved campaign direction into a scalable library of localized, audience-specific, product-specific, and platform-ready content—while maintaining brand consistency and preserving human creative oversight.
+
+### Short Pitch:
+> “Go Anywhere with YETI” is a modular campaign and creative-automation prototype that converts a structured brief and approved brand assets into a quality-controlled family of product, audience, regional, and social-media ad variations.
+
+---
+
 # YETI Los Angeles Multi-Format Creative Ad Generator (2026)
 
 A deterministic, high-throughput creative advertising adaptation engine for YETI’s **"Go Anywhere with YETI"** Los Angeles campaign. Built with **FastAPI**, **Pillow (PIL)**, **React 19**, **TypeScript**, and **Vanilla CSS**.
@@ -5,6 +35,7 @@ A deterministic, high-throughput creative advertising adaptation engine for YETI
 Generates **18 deterministic, brand-compliant creative ad adaptations** across **6 audience segments** and **3 industry-standard aspect ratios** (`1:1` Square, `16:9` Landscape, `9:16` Vertical Story) with pixel-perfect composition, typography hierarchy, and controlled asset locking.
 
 ---
+
 
 ## Table of Contents
 1. [Project & Business Overview](#1-project--business-overview)
