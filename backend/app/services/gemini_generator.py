@@ -133,8 +133,9 @@ class GeminiBackgroundGenerator:
         local_output_dir: str = "outputs/generated-backgrounds",
     ):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self.model_name = model_name or os.getenv("GEMINI_IMAGE_MODEL", "imagen-3.0-generate-002")
+        self.model_name = model_name or os.getenv("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
         self.enabled = os.getenv("GEMINI_ENABLED", "true").lower() in ("1", "true", "yes")
+
         self.storage = storage_adapter or get_storage_adapter()
         self.output_dir = Path(local_output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -251,43 +252,44 @@ class GeminiBackgroundGenerator:
             full_prompt = f"{prompt} Negative constraints: strictly avoid {negative_prompt}."
             img_bytes = None
 
-            # Attempt 1: Imagen 3 model suite via generate_images
-            for m_candidate in [self.model_name, "imagen-3.0-generate-002", "imagen-3.0"]:
+            # Primary Generator: Google Gemini Image models via generate_content
+            for m_candidate in ["gemini-2.5-flash-image", "gemini-3.1-flash-image", "gemini-3-pro-image"]:
                 try:
-                    result = client.models.generate_images(
+                    res = client.models.generate_content(
                         model=m_candidate,
-                        prompt=full_prompt,
-                        config=types.GenerateImagesConfig(
-                            number_of_images=1,
-                            output_mime_type="image/png",
-                            aspect_ratio="1:1",
-                        ),
+                        contents=full_prompt,
                     )
-                    if result and result.generated_images:
-                        img_bytes = result.generated_images[0].image.image_bytes
-                        self.model_name = m_candidate
+                    if res.candidates and res.candidates[0].content and res.candidates[0].content.parts:
+                        for part in res.candidates[0].content.parts:
+                            if getattr(part, "inline_data", None) and part.inline_data.data:
+                                img_bytes = part.inline_data.data
+                                self.model_name = m_candidate
+                                break
+                    if img_bytes:
                         break
                 except Exception:
                     continue
 
-            # Attempt 2: Gemini Flash Image models via generate_content
+            # Secondary Generator: Imagen 3 model suite via generate_images
             if not img_bytes:
-                for m_candidate in ["gemini-2.5-flash-image", "gemini-3.1-flash-image", "gemini-3-pro-image"]:
+                for m_candidate in ["imagen-3.0-generate-002", "imagen-3.0"]:
                     try:
-                        res = client.models.generate_content(
+                        result = client.models.generate_images(
                             model=m_candidate,
-                            contents=full_prompt,
+                            prompt=full_prompt,
+                            config=types.GenerateImagesConfig(
+                                number_of_images=1,
+                                output_mime_type="image/png",
+                                aspect_ratio="1:1",
+                            ),
                         )
-                        if res.candidates and res.candidates[0].content and res.candidates[0].content.parts:
-                            for part in res.candidates[0].content.parts:
-                                if getattr(part, "inline_data", None) and part.inline_data.data:
-                                    img_bytes = part.inline_data.data
-                                    self.model_name = m_candidate
-                                    break
-                        if img_bytes:
+                        if result and result.generated_images:
+                            img_bytes = result.generated_images[0].image.image_bytes
+                            self.model_name = m_candidate
                             break
                     except Exception:
                         continue
+
 
             if not img_bytes:
                 # Quota limit or model restricted - use high-quality procedural lighting fallback
