@@ -294,11 +294,12 @@ class AdCompositor:
         draw_debug_overlay: bool = False,
         product_gradient_path: Optional[str] = "assets/gradients/#grad1.png",
         logo_gradient_path: Optional[str] = "assets/gradients/#grad2.png",
+        logo_white_gradient_path: Optional[str] = "assets/gradients/#grad2_white.png",
     ) -> Image.Image:
         """
         Render a finished ad in the requested aspect ratio following strict layer ordering:
         1. selectedBackground
-        2. top gradient (#grad2.png) if white logo
+        2. top gradient (#grad2.png for white logo, #grad2_white.png for black logo)
         3. product gradient (#grad1.png)
         4. optional productShadow
         5. selectedProductAsset
@@ -319,20 +320,23 @@ class AdCompositor:
             focal_point=layout.background_focal_point,
         )
 
-        # 2. Top Gradient for White Logo (#grad2.png)
-        if logo_gradient_path and os.path.exists(logo_gradient_path):
-            if is_white_logo(logo_img):
-                try:
-                    with Image.open(logo_gradient_path) as g2_raw:
-                        g2_rgba = g2_raw.convert("RGBA")
-                        g2_w = W
-                        g2_h = int(g2_rgba.height * (W / g2_rgba.width))
-                        g2_scaled = g2_rgba.resize((g2_w, g2_h), Image.Resampling.LANCZOS)
-                        g2_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-                        g2_layer.paste(g2_scaled, (0, 0), g2_scaled)
-                        canvas = Image.alpha_composite(canvas, g2_layer)
-                except Exception:
-                    pass
+        # 2. Top Gradient for Logo (#grad2.png for white logo, #grad2_white.png for black logo)
+        is_white = is_white_logo(logo_img)
+        chosen_logo_gradient = logo_gradient_path if is_white else logo_white_gradient_path
+
+        if chosen_logo_gradient and os.path.exists(chosen_logo_gradient):
+            try:
+                with Image.open(chosen_logo_gradient) as g2_raw:
+                    g2_rgba = g2_raw.convert("RGBA")
+                    g2_w = W
+                    g2_h = int(g2_rgba.height * (W / g2_rgba.width))
+                    g2_scaled = g2_rgba.resize((g2_w, g2_h), Image.Resampling.LANCZOS)
+                    g2_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                    g2_layer.paste(g2_scaled, (0, 0), g2_scaled)
+                    canvas = Image.alpha_composite(canvas, g2_layer)
+            except Exception:
+                pass
+
 
         # 3. Product Sizing and Position
         max_prod_w = int(layout.product_region.max_width_pct * W)
