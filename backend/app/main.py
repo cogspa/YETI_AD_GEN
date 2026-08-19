@@ -53,6 +53,22 @@ def get_storage_status():
     return adapter.get_status()
 
 
+@app.get("/api/integrations/status")
+def get_integrations_status():
+    """Returns live readiness for Storage and Gemini AI scene provider."""
+    storage_adapter = get_storage_adapter()
+    gemini_gen = GeminiBackgroundGenerator()
+    return {
+        "storage": storage_adapter.get_status().model_dump(),
+        "gemini": {
+            "configured": gemini_gen.is_configured(),
+            "model": gemini_gen.model_name,
+            "status": "active" if gemini_gen.is_configured() else "standby",
+        }
+    }
+
+
+
 @app.post("/api/brief/validate")
 def validate_brief_endpoint(brief: Dict[str, Any] = Body(...)):
     """Validates campaign brief against strict contract."""

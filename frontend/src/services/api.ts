@@ -47,6 +47,26 @@ export interface StorageStatus {
   error?: string;
 }
 
+export interface IntegrationStatusResponse {
+  storage: StorageStatus;
+  gemini: {
+    configured: boolean;
+    model: string;
+    status: 'active' | 'standby';
+  };
+}
+
+export async function fetchIntegrationStatus(): Promise<IntegrationStatusResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/integrations/status`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+
 export interface GeneratedAdArtifact {
   artifact_id: string;
   concept_id: string;

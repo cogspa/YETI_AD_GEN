@@ -149,16 +149,44 @@ class GeminiBackgroundGenerator:
         territory: Optional[str] = None,
         custom_suffix: Optional[str] = None,
     ) -> Tuple[str, str]:
-        """Construct a strict guardrailed prompt and negative prompt."""
+        """Construct a strict guardrailed prompt and negative prompt for any activity or territory."""
         act_key = activity.lower().strip()
-        base_prompt = ACTIVITY_PROMPT_TEMPLATES.get(act_key, ACTIVITY_PROMPT_TEMPLATES["beach"])
+        if act_key in ACTIVITY_PROMPT_TEMPLATES:
+            base_prompt = ACTIVITY_PROMPT_TEMPLATES[act_key]
+        else:
+            loc_str = territory if territory else "scenic California outdoors"
+            base_prompt = (
+                f"Commercial cinematic photography of an open-air {activity} outdoor environment in {loc_str}. "
+                "Natural daylight, wide atmospheric landscape, beautiful scenery, and vast clean negative space "
+                "across the central foreground for commercial product packshot composite integration. "
+                "Clean, pristine, uncluttered high-end commercial environment. No coolers, no products, no logos, no text, no people."
+            )
 
-        if territory:
+        if territory and territory not in base_prompt:
             base_prompt = f"{base_prompt} Location context: {territory}."
         if custom_suffix:
             base_prompt = f"{base_prompt} {custom_suffix.strip()}"
 
         return base_prompt, NEGATIVE_PROMPT_DEFAULT
+
+    def generate_for_audience(
+        self,
+        activity: str,
+        territory: Optional[str] = None,
+        audience_id: Optional[str] = None,
+        campaign_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+        custom_prompt_suffix: Optional[str] = None,
+        force_mock: bool = False,
+    ) -> GeneratedBackgroundMetadata:
+        """Generate a tailored background specifically for an audience demographic concept."""
+        return self.generate_background(
+            activity=activity,
+            territory=territory,
+            custom_prompt_suffix=custom_prompt_suffix,
+            force_mock=force_mock,
+        )
+
 
     def generate_background(
         self,
