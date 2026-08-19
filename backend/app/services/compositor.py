@@ -12,16 +12,33 @@ from backend.app.models.layout import (
 )
 
 
-def is_white_logo(img: Image.Image) -> bool:
-    """Determine if a logo asset is predominantly white/light in color."""
+def is_white_logo(img: Image.Image, logo_path: Optional[str] = None) -> bool:
+    """
+    Determine if a logo asset is white/light or black/dark:
+    - Yeti_Logo_4.png (White logo) -> returns True (paired with #grad2.png black top gradient)
+    - Yeti_Logo_1.png (Black logo) -> returns False (paired with #grad2_white.png white top gradient)
+    """
+    if logo_path:
+        lp = logo_path.lower()
+        if "yeti_logo_4" in lp or "white" in lp:
+            return True
+        if "yeti_logo_1" in lp or "black" in lp:
+            return False
+
     try:
         rgba = img.convert("RGBA")
-        r, _, _, a = rgba.split()
-        mask = a.point(lambda p: 255 if p > 30 else 0)
+        r, g, b, a = rgba.split()
+        mask = a.point(lambda p: 255 if p > 128 else 0)
         stat_r = ImageStat.Stat(r, mask=mask)
-        return bool(stat_r.count[0] > 0 and stat_r.mean[0] > 180)
+        stat_g = ImageStat.Stat(g, mask=mask)
+        stat_b = ImageStat.Stat(b, mask=mask)
+        if stat_r.count[0] == 0:
+            return False
+        mean_brightness = (stat_r.mean[0] * 0.299 + stat_g.mean[0] * 0.587 + stat_b.mean[0] * 0.114)
+        return bool(mean_brightness > 128)
     except Exception:
         return False
+
 
 
 
@@ -295,6 +312,7 @@ class AdCompositor:
         product_gradient_path: Optional[str] = "assets/gradients/#grad1.png",
         logo_gradient_path: Optional[str] = "assets/gradients/#grad2.png",
         logo_white_gradient_path: Optional[str] = "assets/gradients/#grad2_white.png",
+        logo_asset_path: Optional[str] = None,
     ) -> Image.Image:
         """
         Render a finished ad in the requested aspect ratio following strict layer ordering:
@@ -320,9 +338,10 @@ class AdCompositor:
             focal_point=layout.background_focal_point,
         )
 
-        # 2. Top Gradient for Logo (#grad2.png for white logo, #grad2_white.png for black logo)
-        is_white = is_white_logo(logo_img)
+        # 2. Top Gradient for Logo (#grad2.png for white logo Yeti_Logo_4, #grad2_white.png for black logo Yeti_Logo_1)
+        is_white = is_white_logo(logo_img, logo_path=logo_asset_path)
         chosen_logo_gradient = logo_gradient_path if is_white else logo_white_gradient_path
+
 
         if chosen_logo_gradient and os.path.exists(chosen_logo_gradient):
             try:

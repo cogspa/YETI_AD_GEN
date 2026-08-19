@@ -233,8 +233,10 @@ class CampaignPipelineRunner:
                         logo_img=logo_im,
                         aspect_ratio=ratio,
                         tagline_color_hex=concept.tagline_color_hex,
+                        logo_asset_path=concept.logo_asset_path,
                     )
                     rendered_img.save(out_path, format="PNG", optimize=True)
+
 
                 filesize = out_path.stat().st_size
                 dims = (rendered_img.width, rendered_img.height)
