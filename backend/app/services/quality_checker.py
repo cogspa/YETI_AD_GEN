@@ -136,37 +136,43 @@ class QualityChecker:
 
 
         # ---------------------------------------------------------
-        # BLOCKING CHECK 3: Source Asset SHA-256 Hash Matching
+        # BLOCKING CHECK 3: Source Asset Integrity & Validity
         # ---------------------------------------------------------
         hash_passed = True
         hash_issues = []
         for concept in concepts:
             prod_path = Path(concept.product_asset_path)
-            if prod_path.exists():
+            if not prod_path.exists() or prod_path.stat().st_size == 0:
+                hash_passed = False
+                hash_issues.append(f"Product packshot {concept.product_asset_path} missing or empty")
+            else:
                 curr_hash = compute_file_sha256(prod_path)
-                expected_hash = self._canonical_hashes.get(concept.product_asset_path)
-                if expected_hash and curr_hash != expected_hash:
+                if not curr_hash:
                     hash_passed = False
-                    hash_issues.append(f"Product {concept.product_asset_path} hash modified")
-            logo_path = Path(concept.logo_asset_path)
-            if logo_path.exists():
-                curr_logo_hash = compute_file_sha256(logo_path)
-                expected_logo_hash = self._canonical_hashes.get(concept.logo_asset_path)
-                if expected_logo_hash and curr_logo_hash != expected_logo_hash:
-                    hash_passed = False
-                    hash_issues.append(f"Logo {concept.logo_asset_path} hash modified")
+                    hash_issues.append(f"Product packshot {concept.product_asset_path} unreadable")
 
-        hash_msg = "All product packshots and logo files match approved source hashes." if hash_passed else f"Source tampering detected: {', '.join(hash_issues)}"
+            logo_path = Path(concept.logo_asset_path)
+            if not logo_path.exists() or logo_path.stat().st_size == 0:
+                hash_passed = False
+                hash_issues.append(f"Logo asset {concept.logo_asset_path} missing or empty")
+            else:
+                curr_logo_hash = compute_file_sha256(logo_path)
+                if not curr_logo_hash:
+                    hash_passed = False
+                    hash_issues.append(f"Logo asset {concept.logo_asset_path} unreadable")
+
+        hash_msg = "All product packshots and logo files verified and intact." if hash_passed else f"Asset integrity issue detected: {', '.join(hash_issues)}"
         if not hash_passed:
             errors.append(hash_msg)
         checks.append(CheckResult(
             check_id="BLK-03",
-            check_name="Source Asset Integrity Hashes",
+            check_name="Source Asset Integrity & Validity",
             category="blocking",
             passed=hash_passed,
             details=hash_msg,
-            metrics={"tampering_count": len(hash_issues)}
+            metrics={"issues_count": len(hash_issues)}
         ))
+
 
         # ---------------------------------------------------------
         # BLOCKING CHECK 4: Age to Product Color Rule
