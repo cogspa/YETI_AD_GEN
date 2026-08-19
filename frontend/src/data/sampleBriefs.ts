@@ -330,6 +330,64 @@ export const SAMPLE_BRIEFS: { id: string; filename: string; label: string; brief
         adsPerAudience: 6,
         totalOutputsPerRun: 72
       },
+      backgroundPools: [
+        ...YETI_GO_ANYWHERE_2026_BRIEF.backgroundPools,
+        {
+          id: "hiking-la-trails",
+          activity: "hiking",
+          territory: "Hollywood Hills and Griffith Park",
+          visualDirection: "Open scenic daylight photography of winding dirt trails across the Hollywood Hills and Griffith Park with vast negative space for product packshot.",
+          assets: []
+        },
+        {
+          id: "surfing-pacific-coast",
+          activity: "surfing",
+          territory: "Malibu Surfrider Beach",
+          visualDirection: "Cinematic daylight photography of the Malibu coastline with rolling Pacific swell, clean sand, and uncluttered foreground.",
+          assets: []
+        },
+        {
+          id: "fishing-la-harbor",
+          activity: "fishing",
+          territory: "Marina Del Rey Coastal Waters",
+          visualDirection: "Atmospheric morning photography of open blue Pacific water off Marina Del Rey with soft golden light and clear foreground space.",
+          assets: []
+        },
+        {
+          id: "climbing-stoney-point",
+          activity: "climbing",
+          territory: "Stoney Point Mountain Rocks",
+          visualDirection: "Dramatic sandstone boulders and desert mountain backdrop in Stoney Point with clean foreground for cooler integration.",
+          assets: []
+        }
+      ],
+      taglinePools: [
+        ...YETI_GO_ANYWHERE_2026_BRIEF.taglinePools,
+        {
+          id: "hiking-taglines",
+          activity: "hiking",
+          textColor: "#FFFFFF",
+          taglines: ["GO ANYWHERE"]
+        },
+        {
+          id: "surfing-taglines",
+          activity: "surfing",
+          textColor: "#000000",
+          taglines: ["GO ANYWHERE"]
+        },
+        {
+          id: "fishing-taglines",
+          activity: "fishing",
+          textColor: "#FFFFFF",
+          taglines: ["GO ANYWHERE"]
+        },
+        {
+          id: "climbing-taglines",
+          activity: "climbing",
+          textColor: "#FFFFFF",
+          taglines: ["GO ANYWHERE"]
+        }
+      ],
       audiences: [
         ...YETI_GO_ANYWHERE_2026_BRIEF.audiences,
         {
@@ -414,4 +472,5 @@ export const SAMPLE_BRIEFS: { id: string; filename: string; label: string; brief
     }
   }
 ];
+
 
