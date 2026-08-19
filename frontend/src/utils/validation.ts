@@ -58,7 +58,8 @@ export function validateBrief(data: any): BriefValidationResult {
     warnings.push('Brief does not declare taglinePools.');
   }
 
-  const totalOutputs = audienceCount * formatCount;
+  const conceptsPerAudience = Number(data.generation?.conceptsPerAudience) || 1;
+  const totalOutputs = Number(data.generation?.totalOutputsPerRun) || (audienceCount * formatCount * conceptsPerAudience);
 
   return {
     isValid: errors.length === 0,
@@ -69,3 +70,4 @@ export function validateBrief(data: any): BriefValidationResult {
     totalOutputs,
   };
 }
+

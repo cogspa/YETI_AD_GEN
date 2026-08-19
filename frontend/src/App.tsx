@@ -74,6 +74,9 @@ export const App: React.FC = () => {
     setCurrentStage('Validating JSON');
     setCompletedItems(0);
 
+    const totalExpected = validation.totalOutputs || 
+      ((currentBrief.audiences?.length || 6) * (currentBrief.outputFormats?.length || 3) * (currentBrief.generation?.conceptsPerAudience || 1));
+
     try {
       // Simulate live progressive stage updates during API processing
       const timer1 = setTimeout(() => {
@@ -87,7 +90,7 @@ export const App: React.FC = () => {
       }, 600);
 
       const timer3 = setTimeout(() => {
-        setCurrentStage('Selecting six concepts');
+        setCurrentStage('Selecting concepts');
         setProgressPct(38);
       }, 900);
 
@@ -97,18 +100,18 @@ export const App: React.FC = () => {
       }, 1200);
 
       const timer5 = setTimeout(() => {
-        setCurrentStage('Rendering 18 adaptations');
+        setCurrentStage(`Rendering ${totalExpected} adaptations`);
         setProgressPct(60);
-        setCompletedItems(6);
+        setCompletedItems(Math.floor(totalExpected / 3));
       }, 1600);
 
       const timer6 = setTimeout(() => {
-        setCompletedItems(12);
+        setCompletedItems(Math.floor((totalExpected * 2) / 3));
         setProgressPct(75);
       }, 2100);
 
       const timer7 = setTimeout(() => {
-        setCompletedItems(18);
+        setCompletedItems(totalExpected);
         setCurrentStage('Running checks');
         setProgressPct(88);
       }, 2600);
@@ -130,9 +133,10 @@ export const App: React.FC = () => {
       clearTimeout(timer7);
       clearTimeout(timer8);
 
+      const finalCount = result.total_outputs || totalExpected;
       setCurrentStage('Complete');
       setProgressPct(100);
-      setCompletedItems(18);
+      setCompletedItems(finalCount);
       setCampaignResult(result);
     } catch (err: any) {
       setGenerationError(err.message || 'Generation failed.');
@@ -140,6 +144,7 @@ export const App: React.FC = () => {
       setIsGenerating(false);
     }
   };
+
 
   return (
     <main className="app-viewport">
