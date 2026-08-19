@@ -92,8 +92,9 @@ export const QualityReportModal: React.FC<QualityReportModalProps> = ({
                   {blockingPassed}/{blockingTotal} Blocking Rules Verified & Passed
                 </div>
                 <div style={{ color: '#7E93A7', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-                  Deterministic verification executed across brief, 6 concept plans, and 18 rendered ad compositions.
+                  Deterministic verification executed across brief, {report.total_concepts || report.audience_audits?.length || 'all'} concept plans, and {report.total_outputs || checks.find((c: any) => c.rule_id === 'BLK-01')?.actual_count || 'all'} rendered ad compositions.
                 </div>
+
               </div>
             </div>
             <span className="badge-count" style={{ fontSize: '12px', padding: '4px 10px' }}>

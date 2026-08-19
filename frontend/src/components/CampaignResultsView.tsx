@@ -57,7 +57,7 @@ export const CampaignResultsView: React.FC<CampaignResultsViewProps> = ({
             <div className="results-meta-row">
               <span className="badge-run-id">RUN: {result.run_id}</span>
               <span className="badge-seed">SEED: {result.seed}</span>
-              <span className="badge-count">18 ADS GENERATED</span>
+              <span className="badge-count">{result.total_outputs || result.ads.length} ADS GENERATED</span>
               <span className="badge-seed">⏱️ {result.duration_seconds}s</span>
             </div>
             <h2 className="results-title">{result.campaign_name}</h2>
@@ -69,7 +69,7 @@ export const CampaignResultsView: React.FC<CampaignResultsViewProps> = ({
             {result.zip_bundle_download_url && (
               <a href={result.zip_bundle_download_url} download className="btn-zip-download">
                 <span>📥</span>
-                <span>DOWNLOAD ALL 18 ADS (ZIP)</span>
+                <span>DOWNLOAD ALL {result.total_outputs || result.ads.length} ADS (ZIP)</span>
               </a>
             )}
 
@@ -146,7 +146,8 @@ export const CampaignResultsView: React.FC<CampaignResultsViewProps> = ({
               onChange={(e) => setSelectedActivity(e.target.value)}
               className="filter-dropdown"
             >
-              <option value="all">All Activities (6)</option>
+              <option value="all">All Activities ({result.concepts.length})</option>
+
               <option value="beach">Beach</option>
               <option value="camping">Camping</option>
               <option value="tailgating">Tailgating</option>
