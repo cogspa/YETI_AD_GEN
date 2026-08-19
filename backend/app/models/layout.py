@@ -74,7 +74,7 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
         ),
         tagline_region=NormalizedRegion(
             x=0.50,
-            y=(1080 - 35) / 1080,  # Exactly 35px from bottom edge (1045px)
+            y=(1080 - 40) / 1080,  # Exactly 40px from bottom edge (1040px)
             max_width_pct=0.84,
             max_height_pct=0.18,
             anchor_x="center",
@@ -108,12 +108,13 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
         ),
         tagline_region=NormalizedRegion(
             x=0.50,
-            y=(1080 - 35) / 1080,  # Exactly 35px from bottom edge (1045px)
+            y=(1080 - 40) / 1080,  # Exactly 40px from bottom edge (1040px)
             max_width_pct=0.684,
             max_height_pct=0.19,
             anchor_x="center",
             anchor_y="bottom",
         ),
+
 
 
 
