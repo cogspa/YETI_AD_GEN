@@ -24,19 +24,20 @@ export interface AssetReadinessReport {
   summary_messages: string[];
 }
 
+const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL ? String(import.meta.env.VITE_API_URL).replace(/\/$/, '') : '');
+
 export async function fetchAssetReadiness(): Promise<AssetReadinessReport | null> {
   try {
-    const baseUrl = typeof window !== 'undefined' && window.location?.origin ? '' : 'http://localhost:8000';
-    const res = await fetch(`${baseUrl}/api/assets/readiness`);
+    const res = await fetch(`${API_BASE}/api/assets/readiness`);
     if (!res.ok) {
       throw new Error(`Server returned HTTP ${res.status}: ${res.statusText}`);
     }
     return await res.json();
   } catch {
-
     return null;
   }
 }
+
 
 export interface StorageStatus {
   configured: boolean;
@@ -121,11 +122,10 @@ export interface CampaignRunResult {
 
 export async function fetchStorageStatus(): Promise<StorageStatus | null> {
   try {
-    const res = await fetch('/api/storage/status');
+    const res = await fetch(`${API_BASE}/api/storage/status`);
     if (!res.ok) return null;
     return await res.json();
   } catch {
-
     return null;
   }
 }
@@ -134,12 +134,14 @@ export async function generateCampaignAds(
   briefData: any,
   seed?: number | null,
 ): Promise<CampaignRunResult> {
-  const url = seed !== undefined && seed !== null ? `/api/campaign/generate?seed=${seed}` : '/api/campaign/generate';
+  const endpoint = seed !== undefined && seed !== null ? `/api/campaign/generate?seed=${seed}` : '/api/campaign/generate';
+  const url = `${API_BASE}${endpoint}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(briefData),
   });
+
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({ detail: `HTTP ${res.status}: ${res.statusText}` }));
