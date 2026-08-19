@@ -175,7 +175,7 @@ export const App: React.FC = () => {
         ) : (
           /* Otherwise show Brief Configuration & Readiness view */
           <div className="space-y-6">
-            {/* Campaign Brief (JSON) */}
+            {/* Campaign Brief (JSON) & Inspect/Edit JSON */}
             <BriefUploadSection
               currentBrief={currentBrief}
               currentFilename={currentFilename}
@@ -185,7 +185,15 @@ export const App: React.FC = () => {
               onReset={handleReset}
             />
 
-            {/* Campaign Summary (6 audiences × 3 formats = 18 outputs) */}
+            {/* Generate Action Button directly after JSON section */}
+            <GenerateAction
+              isValid={validation.isValid}
+              totalOutputs={validation.totalOutputs}
+              isGenerating={isGenerating}
+              onGenerateClick={handleGenerateClick}
+            />
+
+            {/* Campaign Summary (audiences × formats matrix) */}
             <CampaignSummary brief={currentBrief} />
 
             {/* Asset Readiness */}
@@ -193,15 +201,8 @@ export const App: React.FC = () => {
 
             {/* Integration Status */}
             <IntegrationStatus />
-
-            {/* Generate Action Button */}
-            <GenerateAction
-              isValid={validation.isValid}
-              totalOutputs={validation.totalOutputs}
-              isGenerating={isGenerating}
-              onGenerateClick={handleGenerateClick}
-            />
           </div>
+
         )}
 
         {/* Live Generation Progress Modal */}
