@@ -59,8 +59,8 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
         logo_region=NormalizedRegion(
             x=0.50,
             y=0.085,
-            max_width_pct=0.28,
-            max_height_pct=0.10,
+            max_width_pct=0.336,  # Increased by 20% (0.28 -> 0.336)
+            max_height_pct=0.12,   # Increased by 20% (0.10 -> 0.12)
             anchor_x="center",
             anchor_y="top",
         ),
@@ -74,7 +74,7 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
         ),
         tagline_region=NormalizedRegion(
             x=0.50,
-            y=(1080 - 30) / 1080,  # Exactly 30px from bottom edge (1050px)
+            y=(1080 - 55) / 1080,  # Raised by 25px (from 30px to 55px from bottom edge)
             max_width_pct=0.84,
             max_height_pct=0.18,
             anchor_x="center",
@@ -93,32 +93,27 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
         logo_region=NormalizedRegion(
             x=0.50,
             y=0.085,
-            max_width_pct=0.18,
-            max_height_pct=0.10,
+            max_width_pct=0.216,  # Increased by 20% (0.18 -> 0.216)
+            max_height_pct=0.12,   # Increased by 20% (0.10 -> 0.12)
             anchor_x="center",
             anchor_y="top",
         ),
         product_region=NormalizedRegion(
             x=0.50,
             y=0.52,
-            max_width_pct=0.4784,  # Decreased by 8% (0.52 -> 0.4784)
-            max_height_pct=0.6256,  # Decreased by 8% (0.68 -> 0.6256)
+            max_width_pct=0.4784,
+            max_height_pct=0.6256,
             anchor_x="center",
             anchor_y="center",
         ),
         tagline_region=NormalizedRegion(
             x=0.50,
-            y=(1080 - 30) / 1080,  # Exactly 30px from bottom edge (1050px)
+            y=(1080 - 55) / 1080,  # Raised by 25px (from 30px to 55px from bottom edge)
             max_width_pct=0.684,
             max_height_pct=0.19,
             anchor_x="center",
             anchor_y="bottom",
         ),
-
-
-
-
-
         min_separation_pct=0.04,
         shadow=ShadowConfig(enabled=True, opacity=0.35, blur_radius=22, offset_y_pct=0.015),
     ),
@@ -132,24 +127,24 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
         logo_region=NormalizedRegion(
             x=0.50,
             y=0.085,
-            max_width_pct=0.30,
-            max_height_pct=0.08,
+            max_width_pct=0.36,   # Increased by 20% (0.30 -> 0.36)
+            max_height_pct=0.096,  # Increased by 20% (0.08 -> 0.096)
             anchor_x="center",
             anchor_y="top",
         ),
         product_region=NormalizedRegion(
             x=0.50,
             y=0.48,
-            max_width_pct=0.684,  # Decreased by 10% (0.76 -> 0.684)
-            max_height_pct=0.45,   # Decreased by 10% (0.50 -> 0.45)
+            max_width_pct=0.684,
+            max_height_pct=0.45,
             anchor_x="center",
             anchor_y="center",
         ),
         tagline_region=NormalizedRegion(
             x=0.50,
             y=0.88,
-            max_width_pct=0.834,  # Decreased by 3% (0.86 -> 0.834)
-            max_height_pct=0.155,  # Decreased by 3% (0.16 -> 0.155)
+            max_width_pct=0.834,
+            max_height_pct=0.155,
             anchor_x="center",
             anchor_y="bottom",
         ),
@@ -157,3 +152,4 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
         shadow=ShadowConfig(enabled=True, opacity=0.32, blur_radius=22, offset_y_pct=0.015),
     ),
 }
+
