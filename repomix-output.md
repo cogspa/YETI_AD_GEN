@@ -350,68 +350,6 @@ class GenerationRequest(BaseModel):
     force_mock: bool = False
 ````
 
-## File: backend/app/models/plan.py
-````python
-"""Pydantic models for Concept Planning and Format Render Plans."""
-
-from typing import List, Dict, Optional, Tuple, Literal
-from pydantic import BaseModel, Field
-from backend.app.models.layout import RatioLayoutConfig
-
-
-class AudienceConcept(BaseModel):
-    """Immutable concept selected for a single audience group."""
-    concept_id: str
-    audience_id: str
-    audience_name: str
-    age_band: Literal["younger", "older"]
-    activity: str
-    territory: str
-    product_model: Optional[str] = None
-    product_slug: Optional[str] = None
-    audience_slug: Optional[str] = None
-    product_role: str
-    product_asset_path: str
-    background_pool_id: str
-    selected_background_path: str
-    tagline_pool_id: str
-    selected_tagline_text: str
-    selected_tagline_asset_path: str
-    tagline_color_hex: str
-    logo_asset_path: str
-    seed_used: int
-
-
-class FormatRenderPlan(BaseModel):
-    """Deterministic render specification for a specific aspect ratio adaptation."""
-    plan_id: str
-    concept_id: str
-    audience_id: str
-    aspect_ratio: Literal["1:1", "16:9", "9:16"]
-    output_dimensions: Tuple[int, int]
-    target_filename: str
-    product_slug: Optional[str] = None
-    product_asset_path: str
-    background_asset_path: str
-    tagline_asset_path: str
-    tagline_text: str
-    tagline_color_hex: str
-    logo_asset_path: str
-    layout_config: RatioLayoutConfig
-
-
-class CampaignPlanResult(BaseModel):
-    """Top-level plan result containing 6 audience concepts and 18 format render plans."""
-    campaign_id: str
-    seed: int
-    total_audiences: int = 6
-    total_concepts: int = 6
-    total_render_plans: int = 18
-    concepts: List[AudienceConcept]
-    render_plans: List[FormatRenderPlan]
-    warnings: List[str] = Field(default_factory=list)
-````
-
 ## File: backend/app/models/report.py
 ````python
 """Pydantic models for Deterministic Quality Checks and Run Reports (Step 10)."""
@@ -808,163 +746,6 @@ def test_render_fixture_all_ratios_to_outputs(compositor, resolver):
         debug_path = out_dir / f"fixture_{clean_tag}_debug.png"
         debug_img.save(debug_path, format="PNG")
         assert debug_path.exists()
-````
-
-## File: backend/tests/test_concept_planner.py
-````python
-"""Comprehensive tests for ConceptPlanner service (Prompt 5)."""
-
-import json
-import pytest
-from pathlib import Path
-
-from backend.app.models.brief import CampaignBrief
-from backend.app.services.concept_planner import ConceptPlanner
-from backend.app.services.asset_resolver import AssetResolver
-
-
-@pytest.fixture
-def brief() -> CampaignBrief:
-    with open("yeti_la_random_ad_campaign.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return CampaignBrief(**data)
-
-
-@pytest.fixture
-def planner() -> ConceptPlanner:
-    return ConceptPlanner(AssetResolver())
-
-
-def test_plan_generates_exact_6_concepts_and_18_plans(planner, brief):
-    """Verify exactly 6 audience concepts and 18 format render plans are generated."""
-    result = planner.plan_campaign(brief, seed=42)
-    assert result.total_audiences == 6
-    assert result.total_concepts == 6
-    assert len(result.concepts) == 6
-    assert result.total_render_plans == 18
-    assert len(result.render_plans) == 18
-    assert result.seed == 42
-
-
-def test_age_product_mapping(planner, brief):
-    """Verify younger (<=24) resolves to cooler_orange and older (>=25) to cooler_white."""
-    result = planner.plan_campaign(brief, seed=123)
-    for concept in result.concepts:
-        if concept.age_band == "younger":
-            assert concept.product_role == "product_orange"
-            assert "cooler_orange.png" in concept.product_asset_path
-        elif concept.age_band == "older":
-            assert concept.product_role == "product_white"
-            assert "cooler_white.png" in concept.product_asset_path
-        else:
-            pytest.fail(f"Invalid age band: {concept.age_band}")
-
-
-def test_activity_background_mapping(planner, brief):
-    """Verify activity matches background pool and selected environment."""
-    result = planner.plan_campaign(brief, seed=777)
-    for concept in result.concepts:
-        if concept.activity == "beach":
-            assert "beach" in concept.background_pool_id.lower()
-            assert "Beach.jpg" in concept.selected_background_path
-        elif concept.activity == "camping":
-            assert "camping" in concept.background_pool_id.lower()
-            assert "Camping.jpg" in concept.selected_background_path
-        elif concept.activity == "tailgating":
-            assert "tailgating" in concept.background_pool_id.lower()
-            assert "Tailgate.jpg" in concept.selected_background_path
-
-
-def test_activity_tagline_mapping(planner, brief):
-    """Verify beach gets black tagline (#000000) and camping/tailgate gets white (#FFFFFF)."""
-    result = planner.plan_campaign(brief, seed=999)
-    for concept in result.concepts:
-        if concept.activity == "beach":
-            assert concept.tagline_color_hex == "#000000"
-            assert "TAGLINE_black.png" in concept.selected_tagline_asset_path
-        else:
-            assert concept.tagline_color_hex == "#FFFFFF"
-            assert "TAGLINE_white.png" in concept.selected_tagline_asset_path
-
-
-def test_concept_locking_across_three_ratios(planner, brief):
-    """Confirm 1:1, 16:9, and 9:16 for each audience share the exact same concept parameters."""
-    result = planner.plan_campaign(brief, seed=54321)
-
-    for audience in brief.audiences:
-        plans_for_aud = [p for p in result.render_plans if p.audience_id == audience.id]
-        assert len(plans_for_aud) == 3, f"Expected 3 format render plans for audience {audience.id}"
-
-        ratios = {p.aspect_ratio for p in plans_for_aud}
-        assert ratios == {"1:1", "16:9", "9:16"}
-
-        # Verify locked concept parameters
-        first = plans_for_aud[0]
-        for plan in plans_for_aud[1:]:
-            assert plan.concept_id == first.concept_id
-            assert plan.product_asset_path == first.product_asset_path
-            assert plan.background_asset_path == first.background_asset_path
-            assert plan.tagline_asset_path == first.tagline_asset_path
-            assert plan.tagline_text == first.tagline_text
-            assert plan.tagline_color_hex == first.tagline_color_hex
-            assert plan.logo_asset_path == first.logo_asset_path
-
-
-def test_seeded_reproducibility(planner, brief):
-    """Running twice with the same seed must produce bit-for-bit identical plans."""
-    run1 = planner.plan_campaign(brief, seed=88888)
-    run2 = planner.plan_campaign(brief, seed=88888)
-
-    assert run1.model_dump() == run2.model_dump()
-
-
-def test_repeat_protection_with_prior_manifest(planner, brief):
-    """Test that prior manifest choices are respected when alternatives exist."""
-    prior_manifest = {
-        "concepts": [
-            {
-                "audience_id": "P01",
-                "selected_background_path": "assets/backgrounds/Tailgate.jpg",
-                "selected_tagline_text": "GO ANYWHERE",
-            }
-        ]
-    }
-    result = planner.plan_campaign(brief, seed=123, prior_manifest=prior_manifest)
-    assert len(result.concepts) == 6
-    assert len(result.render_plans) == 18
-
-
-def test_pool_exhaustion_warning(planner, brief):
-    """When a single-item pool is shared by multiple audiences, verify warning is issued without failing."""
-    result = planner.plan_campaign(brief, seed=111)
-    # Backgrounds: 2 beach audiences, 2 camping audiences, 2 tailgate audiences
-    # With 1 asset per pool, repeat is logged cleanly
-    assert len(result.warnings) > 0
-    assert any("exhausted" in w.lower() for w in result.warnings)
-    assert len(result.concepts) == 6
-    assert len(result.render_plans) == 18
-
-
-def test_randomization_occurs_once_per_audience_not_per_ratio(planner, brief):
-    """Ensure randomization is concept-level and not re-rolled during format adaptation."""
-    result = planner.plan_campaign(brief, seed=2026)
-
-    concept_map = {c.concept_id: c for c in result.concepts}
-    for plan in result.render_plans:
-        parent_concept = concept_map[plan.concept_id]
-        assert plan.background_asset_path == parent_concept.selected_background_path
-        assert plan.product_asset_path == parent_concept.product_asset_path
-        assert plan.tagline_asset_path == parent_concept.selected_tagline_asset_path
-
-
-def test_product_and_audience_slug_target_filenames(planner, brief):
-    """Verify target_filenames in render plans contain audience descriptor and product slug."""
-    result = planner.plan_campaign(brief, seed=42)
-    p01_plans = [p for p in result.render_plans if p.audience_id == "P01"]
-    assert len(p01_plans) == 3
-    p01_1x1 = next(p for p in p01_plans if p.aspect_ratio == "1:1")
-    assert p01_1x1.target_filename == "P01_westwood-college_roadie-24-orange_1x1.png"
-    assert p01_1x1.product_slug == "roadie-24-orange"
 ````
 
 ## File: backend/tests/test_gemini_generator.py
@@ -2713,6 +2494,68 @@ if __name__ == "__main__":
 }
 ````
 
+## File: backend/app/models/plan.py
+````python
+"""Pydantic models for Concept Planning and Format Render Plans."""
+
+from typing import List, Dict, Optional, Tuple, Literal
+from pydantic import BaseModel, Field
+from backend.app.models.layout import RatioLayoutConfig
+
+
+class AudienceConcept(BaseModel):
+    """Immutable concept selected for a single audience group."""
+    concept_id: str
+    audience_id: str
+    audience_name: str
+    age_band: Literal["younger", "older"]
+    activity: str
+    territory: str
+    product_model: Optional[str] = None
+    product_slug: Optional[str] = None
+    audience_slug: Optional[str] = None
+    product_role: str
+    product_asset_path: str
+    background_pool_id: str
+    selected_background_path: str
+    tagline_pool_id: str
+    selected_tagline_text: str
+    selected_tagline_asset_path: str
+    tagline_color_hex: str
+    logo_asset_path: str
+    seed_used: int
+
+
+class FormatRenderPlan(BaseModel):
+    """Deterministic render specification for a specific aspect ratio adaptation."""
+    plan_id: str
+    concept_id: str
+    audience_id: str
+    aspect_ratio: Literal["1:1", "16:9", "9:16"]
+    output_dimensions: Tuple[int, int]
+    target_filename: str
+    product_slug: Optional[str] = None
+    product_asset_path: str
+    background_asset_path: str
+    tagline_asset_path: str
+    tagline_text: str
+    tagline_color_hex: str
+    logo_asset_path: str
+    layout_config: RatioLayoutConfig
+
+
+class CampaignPlanResult(BaseModel):
+    """Top-level plan result containing 6 audience concepts and 18 format render plans."""
+    campaign_id: str
+    seed: int
+    total_audiences: int = 6
+    total_concepts: int = 6
+    total_render_plans: int = 18
+    concepts: List[AudienceConcept]
+    render_plans: List[FormatRenderPlan]
+    warnings: List[str] = Field(default_factory=list)
+````
+
 ## File: backend/app/services/storage/__init__.py
 ````python
 """Storage Adapter Module for YETI Ad Generator."""
@@ -3360,106 +3203,161 @@ def test_rejects_obsolete_black_tagline_layer(valid_brief_data):
     assert any("blackTagline" in err for err in errors)
 ````
 
-## File: backend/tests/test_pipeline.py
+## File: backend/tests/test_concept_planner.py
 ````python
-"""Tests for CampaignPipelineRunner and End-to-End Generation (Prompt 9)."""
+"""Comprehensive tests for ConceptPlanner service (Prompt 5)."""
 
 import json
-import zipfile
 import pytest
 from pathlib import Path
-from PIL import Image
 
-from backend.app.services.pipeline_runner import CampaignPipelineRunner
-from backend.app.services.storage.local import LocalStorageAdapter
+from backend.app.models.brief import CampaignBrief
+from backend.app.services.concept_planner import ConceptPlanner
+from backend.app.services.asset_resolver import AssetResolver
 
 
 @pytest.fixture
-def brief_dict():
+def brief() -> CampaignBrief:
     with open("yeti_la_random_ad_campaign.json", "r", encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    return CampaignBrief(**data)
 
 
 @pytest.fixture
-def runner(tmp_path):
-    storage = LocalStorageAdapter(root_dir=str(tmp_path / "storage"))
-    return CampaignPipelineRunner(
-        storage_adapter=storage,
-        local_base_dir=str(tmp_path / "outputs"),
-    )
+def planner() -> ConceptPlanner:
+    return ConceptPlanner(AssetResolver())
 
 
-def test_full_pipeline_execution(runner, brief_dict):
-    """Test full generation of 6 concepts, 18 ads, contact sheet, ZIP bundle, and manifest organized by product and aspect ratio."""
-    events = []
-    def on_progress(event):
-        events.append(event)
-
-    result = runner.execute_campaign(brief_dict, seed=42, progress_callback=on_progress)
-
-    # 1. Verify counts
-    assert result.status == "success"
+def test_plan_generates_exact_6_concepts_and_18_plans(planner, brief):
+    """Verify exactly 6 audience concepts and 18 format render plans are generated."""
+    result = planner.plan_campaign(brief, seed=42)
+    assert result.total_audiences == 6
     assert result.total_concepts == 6
-    assert result.total_outputs == 18
     assert len(result.concepts) == 6
-    assert len(result.ads) == 18
+    assert result.total_render_plans == 18
+    assert len(result.render_plans) == 18
+    assert result.seed == 42
 
-    # 2. Verify products/ hierarchy and aspect ratio folders (e.g., products/roadie-24-orange/1x1/...)
-    p01_ads = [a for a in result.ads if a.audience_id == "P01"]
-    assert len(p01_ads) == 3
-    p01_1x1 = next(a for a in p01_ads if a.aspect_ratio == "1:1")
-    assert p01_1x1.filename == "P01_westwood-college_roadie-24-orange_1x1.png"
-    assert "/products/roadie-24-orange/1x1/" in p01_1x1.local_path
-    assert "products/roadie-24-orange/1x1/" in p01_1x1.storage_path
 
-    # 3. Verify all 18 files exist with correct dimensions and are organized by product and aspect ratio
-    for ad in result.ads:
-        assert Path(ad.local_path).exists()
-        assert ad.filesize_bytes > 0
-        assert "/products/" in ad.local_path
-        clean_ratio = ad.aspect_ratio.replace(":", "x")
-        assert f"/{clean_ratio}/" in ad.local_path
-        assert f"products/{ad.product_slug}/{clean_ratio}/" in ad.storage_path
+def test_age_product_mapping(planner, brief):
+    """Verify younger (<=24) resolves to cooler_orange and older (>=25) to cooler_white."""
+    result = planner.plan_campaign(brief, seed=123)
+    for concept in result.concepts:
+        if concept.age_band == "younger":
+            assert concept.product_role == "product_orange"
+            assert "cooler_orange.png" in concept.product_asset_path
+        elif concept.age_band == "older":
+            assert concept.product_role == "product_white"
+            assert "cooler_white.png" in concept.product_asset_path
+        else:
+            pytest.fail(f"Invalid age band: {concept.age_band}")
 
-        img = Image.open(ad.local_path)
-        assert img.size == ad.dimensions
-        if ad.aspect_ratio == "1:1":
-            assert ad.dimensions == (1080, 1080)
-        elif ad.aspect_ratio == "16:9":
-            assert ad.dimensions == (1920, 1080)
-        elif ad.aspect_ratio == "9:16":
-            assert ad.dimensions == (1080, 1920)
 
-    # 4. Verify Contact Sheet
-    assert result.contact_sheet_local_path is not None
-    assert Path(result.contact_sheet_local_path).exists()
-    cs_img = Image.open(result.contact_sheet_local_path)
-    assert cs_img.width > 1000
-    assert cs_img.height > 1000
+def test_activity_background_mapping(planner, brief):
+    """Verify activity matches background pool and selected environment."""
+    result = planner.plan_campaign(brief, seed=777)
+    for concept in result.concepts:
+        if concept.activity == "beach":
+            assert "beach" in concept.background_pool_id.lower()
+            assert "Beach.jpg" in concept.selected_background_path
+        elif concept.activity == "camping":
+            assert "camping" in concept.background_pool_id.lower()
+            assert "Camping.jpg" in concept.selected_background_path
+        elif concept.activity == "tailgating":
+            assert "tailgating" in concept.background_pool_id.lower()
+            assert "Tailgate.jpg" in concept.selected_background_path
 
-    # 5. Verify ZIP Bundle contains products/ hierarchy
-    assert result.zip_bundle_local_path is not None
-    assert Path(result.zip_bundle_local_path).exists()
-    with zipfile.ZipFile(result.zip_bundle_local_path, "r") as zf:
-        namelist = zf.namelist()
-        assert "contact-sheet.jpg" in namelist
-        # Verify product-first paths in zip
-        assert any(n.startswith("products/roadie-24-orange/1x1/") for n in namelist)
-        assert any(n.startswith("products/roadie-24-orange/16x9/") for n in namelist)
-        assert any(n.startswith("products/roadie-24-orange/9x16/") for n in namelist)
-        assert any("P01_westwood-college_roadie-24-orange_1x1.png" in n for n in namelist)
 
-    # 6. Verify Honesty / Provenance
-    assert result.gemini_used is False
-    assert "All backgrounds reused from approved assets." in result.provenance_summary
+def test_activity_tagline_mapping(planner, brief):
+    """Verify beach gets black tagline (#000000) and camping/tailgate gets white (#FFFFFF)."""
+    result = planner.plan_campaign(brief, seed=999)
+    for concept in result.concepts:
+        if concept.activity == "beach":
+            assert concept.tagline_color_hex == "#000000"
+            assert "TAGLINE_black.png" in concept.selected_tagline_asset_path
+        else:
+            assert concept.tagline_color_hex == "#FFFFFF"
+            assert "TAGLINE_white.png" in concept.selected_tagline_asset_path
 
-    # 7. Verify Progress Events
-    stages = [e.stage for e in events]
-    assert "Validating JSON" in stages
-    assert "Resolving controlled assets" in stages
-    assert any("Selecting" in s for s in stages)
-    assert any("Rendering" in s for s in stages)
-    assert "Complete" in stages
+
+def test_concept_locking_across_three_ratios(planner, brief):
+    """Confirm 1:1, 16:9, and 9:16 for each audience share the exact same concept parameters."""
+    result = planner.plan_campaign(brief, seed=54321)
+
+    for audience in brief.audiences:
+        plans_for_aud = [p for p in result.render_plans if p.audience_id == audience.id]
+        assert len(plans_for_aud) == 3, f"Expected 3 format render plans for audience {audience.id}"
+
+        ratios = {p.aspect_ratio for p in plans_for_aud}
+        assert ratios == {"1:1", "16:9", "9:16"}
+
+        # Verify locked concept parameters
+        first = plans_for_aud[0]
+        for plan in plans_for_aud[1:]:
+            assert plan.concept_id == first.concept_id
+            assert plan.product_asset_path == first.product_asset_path
+            assert plan.background_asset_path == first.background_asset_path
+            assert plan.tagline_asset_path == first.tagline_asset_path
+            assert plan.tagline_text == first.tagline_text
+            assert plan.tagline_color_hex == first.tagline_color_hex
+            assert plan.logo_asset_path == first.logo_asset_path
+
+
+def test_seeded_reproducibility(planner, brief):
+    """Running twice with the same seed must produce bit-for-bit identical plans."""
+    run1 = planner.plan_campaign(brief, seed=88888)
+    run2 = planner.plan_campaign(brief, seed=88888)
+
+    assert run1.model_dump() == run2.model_dump()
+
+
+def test_repeat_protection_with_prior_manifest(planner, brief):
+    """Test that prior manifest choices are respected when alternatives exist."""
+    prior_manifest = {
+        "concepts": [
+            {
+                "audience_id": "P01",
+                "selected_background_path": "assets/backgrounds/Tailgate.jpg",
+                "selected_tagline_text": "GO ANYWHERE",
+            }
+        ]
+    }
+    result = planner.plan_campaign(brief, seed=123, prior_manifest=prior_manifest)
+    assert len(result.concepts) == 6
+    assert len(result.render_plans) == 18
+
+
+def test_pool_exhaustion_warning(planner, brief):
+    """When a single-item pool is shared by multiple audiences, verify warning is issued without failing."""
+    result = planner.plan_campaign(brief, seed=111)
+    # Backgrounds: 2 beach audiences, 2 camping audiences, 2 tailgate audiences
+    # With 1 asset per pool, repeat is logged cleanly
+    assert len(result.warnings) > 0
+    assert any("exhausted" in w.lower() for w in result.warnings)
+    assert len(result.concepts) == 6
+    assert len(result.render_plans) == 18
+
+
+def test_randomization_occurs_once_per_audience_not_per_ratio(planner, brief):
+    """Ensure randomization is concept-level and not re-rolled during format adaptation."""
+    result = planner.plan_campaign(brief, seed=2026)
+
+    concept_map = {c.concept_id: c for c in result.concepts}
+    for plan in result.render_plans:
+        parent_concept = concept_map[plan.concept_id]
+        assert plan.background_asset_path == parent_concept.selected_background_path
+        assert plan.product_asset_path == parent_concept.product_asset_path
+        assert plan.tagline_asset_path == parent_concept.selected_tagline_asset_path
+
+
+def test_product_and_audience_slug_target_filenames(planner, brief):
+    """Verify target_filenames in render plans contain audience descriptor and product slug."""
+    result = planner.plan_campaign(brief, seed=42)
+    p01_plans = [p for p in result.render_plans if p.audience_id == "P01"]
+    assert len(p01_plans) == 3
+    p01_1x1 = next(p for p in p01_plans if p.aspect_ratio == "1:1")
+    assert p01_1x1.target_filename == "P01_westwood-college_roadie-24-orange_1x1.png"
+    assert p01_1x1.product_slug == "roadie-24-orange"
 ````
 
 ## File: backend/tests/test_quality_checker.py
@@ -3920,121 +3818,6 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({ ad, onClose }) => 
 };
 ````
 
-## File: frontend/src/types/campaign.ts
-````typescript
-export interface AgeRange {
-  minimum: number;
-  maximum: number;
-  band?: string;
-}
-
-export interface CampaignMeta {
-  id: string;
-  name: string;
-  market: string;
-  ageRange: AgeRange;
-  objective: string;
-  campaignLine: string;
-}
-
-export interface Audience {
-  id: string;
-  name: string;
-  age: AgeRange;
-  lifeStage: string;
-  activity: 'tailgating' | 'beach' | 'camping' | string;
-  territory: string;
-  backgroundPoolId: string;
-  taglinePoolId: string;
-  productModel: string;
-  productColor: 'orange' | 'white' | string;
-  productAssetId: string;
-}
-
-export interface OutputFormat {
-  id: string;
-  aspectRatio: string;
-  width: number;
-  height: number;
-  filenameTag: string;
-}
-
-export interface ProductAsset {
-  colorName: string;
-  assetPath: string;
-  assignedAgeBand: string;
-}
-
-export interface TaglineAsset {
-  colorName: string;
-  hex: string;
-  assetPath: string;
-  activities: string[];
-}
-
-export interface BackgroundPool {
-  id: string;
-  activity: string;
-  territory: string;
-  visualDirection: string;
-  assets: string[];
-}
-
-export interface TaglinePool {
-  id: string;
-  activity: string;
-  textColor: string;
-  taglines: string[];
-}
-
-export interface CampaignBrief {
-  schemaVersion: string;
-  campaign: CampaignMeta;
-  generation?: {
-    mode?: string;
-    seed?: number | null;
-    conceptsPerAudience?: number;
-    randomizeOncePerAudience?: boolean;
-    renderAllFormatsFromSameConcept?: boolean;
-    adsPerAudience?: number;
-    totalAudienceGroups?: number;
-    totalOutputsPerRun?: number;
-    selectionRules?: Record<string, string>;
-    repeatProtection?: Record<string, any>;
-  };
-
-  creativeRules?: Record<string, any>;
-  productAssets?: Record<string, ProductAsset>;
-  taglineAssets?: Record<string, TaglineAsset>;
-  backgroundPools: BackgroundPool[];
-  taglinePools: TaglinePool[];
-  audiences: Audience[];
-  outputFormats: OutputFormat[];
-  composition?: {
-    layersBackToFront: string[];
-    logoAssetPath: string;
-    taglineColorRule?: string;
-    defaultCallToAction?: string;
-  };
-  qualityChecks?: string[];
-  output?: {
-    directory: string;
-    filenamePattern: string;
-    writeManifest: boolean;
-    manifestFilename: string;
-  };
-}
-
-export interface BriefValidationResult {
-  isValid: boolean;
-  errors: string[];
-  warnings: string[];
-  audienceCount: number;
-  formatCount: number;
-  totalOutputs: number;
-}
-````
-
 ## File: frontend/src/utils/validation.ts
 ````typescript
 import type { BriefValidationResult } from '../types/campaign';
@@ -4251,84 +4034,6 @@ npx --prefix frontend oxlint
    - When an asset pool has fewer unique assets than audiences (e.g. 2 camping backgrounds for 3 camping audiences), the system gracefully reuses an approved asset and logs a deterministic warning note rather than aborting the pipeline.
 4. **Storage Graceful Degradation**:
    - When Dropbox credentials are not configured or network requests fail, the pipeline falls back to local storage in `outputs/` without failing the generation run.
-````
-
-## File: backend/app/models/pipeline.py
-````python
-"""Pydantic models for Pipeline Execution, Contact Sheet, and Run Artifacts."""
-
-from typing import List, Dict, Optional, Tuple, Literal, Any
-from pydantic import BaseModel, Field
-from datetime import datetime, timezone
-
-from backend.app.models.plan import AudienceConcept, FormatRenderPlan
-
-
-class GeneratedAdArtifact(BaseModel):
-    """Metadata and paths for a single rendered ad format."""
-    artifact_id: str
-    concept_id: str
-    audience_id: str
-    audience_name: str
-    activity: str
-    territory: str
-    age_band: str
-    product_model: Optional[str] = None
-    product_slug: Optional[str] = None
-    audience_slug: Optional[str] = None
-    product_color: str
-    aspect_ratio: Literal["1:1", "16:9", "9:16"]
-    dimensions: Tuple[int, int]
-    filename: str
-    local_path: str
-    preview_url: str
-    storage_path: Optional[str] = None
-    filesize_bytes: int = 0
-    background_source: str  # "approved_asset", "gemini_generated", "mock_generated"
-    human_review_required: bool = False
-
-
-class PipelineStageEvent(BaseModel):
-    """Event emitted during pipeline execution stages."""
-    stage: str
-    progress_pct: int
-    completed_items: int = 0
-    total_items: int = 18
-    message: str
-
-
-class CampaignRunResult(BaseModel):
-    """Full end-to-end campaign run result."""
-    run_id: str
-    campaign_id: str
-    campaign_name: str
-    seed: int
-    status: Literal["success", "failed", "partial"]
-    started_at: str
-    completed_at: str
-    duration_seconds: float
-    total_concepts: int = 6
-    total_outputs: int = 18
-    concepts: List[AudienceConcept]
-    render_plans: List[FormatRenderPlan]
-    ads: List[GeneratedAdArtifact]
-    contact_sheet_local_path: Optional[str] = None
-    contact_sheet_preview_url: Optional[str] = None
-    zip_bundle_local_path: Optional[str] = None
-    zip_bundle_download_url: Optional[str] = None
-    storage_mode: str  # "dropbox" or "local"
-    dropbox_folder_path: Optional[str] = None
-    dropbox_shared_link: Optional[str] = None
-    quality_report: Optional[Dict[str, Any]] = None
-    report_download_url: Optional[str] = None
-    manifest_download_url: Optional[str] = None
-    pipeline_log_url: Optional[str] = None
-
-    provenance_summary: str
-    gemini_used: bool = False
-    gemini_audiences: List[str] = Field(default_factory=list)
-    warnings: List[str] = Field(default_factory=list)
-    errors: List[str] = Field(default_factory=list)
 ````
 
 ## File: backend/app/services/quality_checker.py
@@ -4763,6 +4468,108 @@ class QualityChecker:
                 return round(min(1.0, variance / 64.0), 2)
         except Exception:
             return 0.2
+````
+
+## File: backend/tests/test_pipeline.py
+````python
+"""Tests for CampaignPipelineRunner and End-to-End Generation (Prompt 9)."""
+
+import json
+import zipfile
+import pytest
+from pathlib import Path
+from PIL import Image
+
+from backend.app.services.pipeline_runner import CampaignPipelineRunner
+from backend.app.services.storage.local import LocalStorageAdapter
+
+
+@pytest.fixture
+def brief_dict():
+    with open("yeti_la_random_ad_campaign.json", "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+@pytest.fixture
+def runner(tmp_path):
+    storage = LocalStorageAdapter(root_dir=str(tmp_path / "storage"))
+    return CampaignPipelineRunner(
+        storage_adapter=storage,
+        local_base_dir=str(tmp_path / "outputs"),
+    )
+
+
+def test_full_pipeline_execution(runner, brief_dict):
+    """Test full generation of 6 concepts, 18 ads, contact sheet, ZIP bundle, and manifest organized by product and aspect ratio."""
+    events = []
+    def on_progress(event):
+        events.append(event)
+
+    result = runner.execute_campaign(brief_dict, seed=42, progress_callback=on_progress)
+
+    # 1. Verify counts
+    assert result.status == "success"
+    assert result.total_concepts == 6
+    assert result.total_outputs == 18
+    assert len(result.concepts) == 6
+    assert len(result.ads) == 18
+
+    # 2. Verify products/ hierarchy and aspect ratio folders (e.g., products/roadie-24-orange/1x1/...)
+    p01_ads = [a for a in result.ads if a.audience_id == "P01"]
+    assert len(p01_ads) == 3
+    p01_1x1 = next(a for a in p01_ads if a.aspect_ratio == "1:1")
+    assert p01_1x1.filename == "P01_westwood-college_roadie-24-orange_1x1.png"
+    assert "/products/roadie-24-orange/1x1/" in p01_1x1.local_path
+    assert "products/roadie-24-orange/1x1/" in p01_1x1.storage_path
+
+    # 3. Verify all 18 files exist with correct dimensions and are organized by product and aspect ratio
+    for ad in result.ads:
+        assert Path(ad.local_path).exists()
+        assert ad.filesize_bytes > 0
+        assert "/products/" in ad.local_path
+        clean_ratio = ad.aspect_ratio.replace(":", "x")
+        assert f"/{clean_ratio}/" in ad.local_path
+        assert f"products/{ad.product_slug}/{clean_ratio}/" in ad.storage_path
+
+        img = Image.open(ad.local_path)
+        assert img.size == ad.dimensions
+        if ad.aspect_ratio == "1:1":
+            assert ad.dimensions == (1080, 1080)
+        elif ad.aspect_ratio == "16:9":
+            assert ad.dimensions == (1920, 1080)
+        elif ad.aspect_ratio == "9:16":
+            assert ad.dimensions == (1080, 1920)
+
+    # 4. Verify Contact Sheet
+    assert result.contact_sheet_local_path is not None
+    assert Path(result.contact_sheet_local_path).exists()
+    cs_img = Image.open(result.contact_sheet_local_path)
+    assert cs_img.width > 1000
+    assert cs_img.height > 1000
+
+    # 5. Verify ZIP Bundle contains products/ hierarchy
+    assert result.zip_bundle_local_path is not None
+    assert Path(result.zip_bundle_local_path).exists()
+    with zipfile.ZipFile(result.zip_bundle_local_path, "r") as zf:
+        namelist = zf.namelist()
+        assert "contact-sheet.jpg" in namelist
+        # Verify product-first paths in zip
+        assert any(n.startswith("products/roadie-24-orange/1x1/") for n in namelist)
+        assert any(n.startswith("products/roadie-24-orange/16x9/") for n in namelist)
+        assert any(n.startswith("products/roadie-24-orange/9x16/") for n in namelist)
+        assert any("P01_westwood-college_roadie-24-orange_1x1.png" in n for n in namelist)
+
+    # 6. Verify Honesty / Provenance
+    assert result.gemini_used is False
+    assert "All backgrounds reused from approved assets." in result.provenance_summary
+
+    # 7. Verify Progress Events
+    stages = [e.stage for e in events]
+    assert "Validating JSON" in stages
+    assert "Resolving controlled assets" in stages
+    assert any("Selecting" in s for s in stages)
+    assert any("Rendering" in s for s in stages)
+    assert "Complete" in stages
 ````
 
 ## File: backend/requirements.txt
@@ -5478,6 +5285,121 @@ export const QualityReportModal: React.FC<QualityReportModalProps> = ({
     </div>
   );
 };
+````
+
+## File: frontend/src/types/campaign.ts
+````typescript
+export interface AgeRange {
+  minimum: number;
+  maximum: number;
+  band?: string;
+}
+
+export interface CampaignMeta {
+  id: string;
+  name: string;
+  market: string;
+  ageRange: AgeRange;
+  objective: string;
+  campaignLine: string;
+}
+
+export interface Audience {
+  id: string;
+  name: string;
+  age: AgeRange;
+  lifeStage: string;
+  activity: 'tailgating' | 'beach' | 'camping' | string;
+  territory: string;
+  backgroundPoolId: string;
+  taglinePoolId: string;
+  productModel: string;
+  productColor: 'orange' | 'white' | string;
+  productAssetId: string;
+}
+
+export interface OutputFormat {
+  id: string;
+  aspectRatio: string;
+  width: number;
+  height: number;
+  filenameTag: string;
+}
+
+export interface ProductAsset {
+  colorName: string;
+  assetPath: string;
+  assignedAgeBand: string;
+}
+
+export interface TaglineAsset {
+  colorName: string;
+  hex: string;
+  assetPath: string;
+  activities: string[];
+}
+
+export interface BackgroundPool {
+  id: string;
+  activity: string;
+  territory: string;
+  visualDirection: string;
+  assets: string[];
+}
+
+export interface TaglinePool {
+  id: string;
+  activity: string;
+  textColor: string;
+  taglines: string[];
+}
+
+export interface CampaignBrief {
+  schemaVersion: string;
+  campaign: CampaignMeta;
+  generation?: {
+    mode?: string;
+    seed?: number | null;
+    conceptsPerAudience?: number;
+    randomizeOncePerAudience?: boolean;
+    renderAllFormatsFromSameConcept?: boolean;
+    adsPerAudience?: number;
+    totalAudienceGroups?: number;
+    totalOutputsPerRun?: number;
+    selectionRules?: Record<string, string>;
+    repeatProtection?: Record<string, any>;
+  };
+
+  creativeRules?: Record<string, any>;
+  productAssets?: Record<string, ProductAsset>;
+  taglineAssets?: Record<string, TaglineAsset>;
+  backgroundPools: BackgroundPool[];
+  taglinePools: TaglinePool[];
+  audiences: Audience[];
+  outputFormats: OutputFormat[];
+  composition?: {
+    layersBackToFront: string[];
+    logoAssetPath: string;
+    taglineColorRule?: string;
+    defaultCallToAction?: string;
+  };
+  qualityChecks?: string[];
+  output?: {
+    directory: string;
+    filenamePattern: string;
+    writeManifest: boolean;
+    manifestFilename: string;
+  };
+}
+
+export interface BriefValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  audienceCount: number;
+  formatCount: number;
+  totalOutputs: number;
+}
 ````
 
 ## File: frontend/src/index.css
@@ -7347,6 +7269,84 @@ Thumbs.db
 }
 ````
 
+## File: backend/app/models/pipeline.py
+````python
+"""Pydantic models for Pipeline Execution, Contact Sheet, and Run Artifacts."""
+
+from typing import List, Dict, Optional, Tuple, Literal, Any
+from pydantic import BaseModel, Field
+from datetime import datetime, timezone
+
+from backend.app.models.plan import AudienceConcept, FormatRenderPlan
+
+
+class GeneratedAdArtifact(BaseModel):
+    """Metadata and paths for a single rendered ad format."""
+    artifact_id: str
+    concept_id: str
+    audience_id: str
+    audience_name: str
+    activity: str
+    territory: str
+    age_band: str
+    product_model: Optional[str] = None
+    product_slug: Optional[str] = None
+    audience_slug: Optional[str] = None
+    product_color: str
+    aspect_ratio: Literal["1:1", "16:9", "9:16"]
+    dimensions: Tuple[int, int]
+    filename: str
+    local_path: str
+    preview_url: str
+    storage_path: Optional[str] = None
+    filesize_bytes: int = 0
+    background_source: str  # "approved_asset", "gemini_generated", "mock_generated"
+    human_review_required: bool = False
+
+
+class PipelineStageEvent(BaseModel):
+    """Event emitted during pipeline execution stages."""
+    stage: str
+    progress_pct: int
+    completed_items: int = 0
+    total_items: int = 18
+    message: str
+
+
+class CampaignRunResult(BaseModel):
+    """Full end-to-end campaign run result."""
+    run_id: str
+    campaign_id: str
+    campaign_name: str
+    seed: int
+    status: Literal["success", "failed", "partial"]
+    started_at: str
+    completed_at: str
+    duration_seconds: float
+    total_concepts: int = 6
+    total_outputs: int = 18
+    concepts: List[AudienceConcept]
+    render_plans: List[FormatRenderPlan]
+    ads: List[GeneratedAdArtifact]
+    contact_sheet_local_path: Optional[str] = None
+    contact_sheet_preview_url: Optional[str] = None
+    zip_bundle_local_path: Optional[str] = None
+    zip_bundle_download_url: Optional[str] = None
+    storage_mode: str  # "dropbox" or "local"
+    dropbox_folder_path: Optional[str] = None
+    dropbox_shared_link: Optional[str] = None
+    quality_report: Optional[Dict[str, Any]] = None
+    report_download_url: Optional[str] = None
+    manifest_download_url: Optional[str] = None
+    pipeline_log_url: Optional[str] = None
+
+    provenance_summary: str
+    gemini_used: bool = False
+    gemini_audiences: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    errors: List[str] = Field(default_factory=list)
+````
+
 ## File: backend/app/services/storage/dropbox_adapter.py
 ````python
 """Dropbox Storage Adapter implementation using official Dropbox Python SDK."""
@@ -8074,246 +8074,6 @@ class AssetResolver:
             gemini_eligible_missing_count=gemini_eligible_missing,
             assets=assets,
             summary_messages=summary_messages,
-        )
-````
-
-## File: backend/app/services/concept_planner.py
-````python
-"""Concept Planner for Multi-Audience Campaigns."""
-
-import random
-import re
-from typing import Dict, List, Optional, Any, Tuple
-from collections import defaultdict
-
-from backend.app.models.brief import CampaignBrief, Audience
-from backend.app.models.layout import LAYOUT_CONFIGS
-from backend.app.models.plan import (
-    AudienceConcept,
-    FormatRenderPlan,
-    CampaignPlanResult,
-)
-from backend.app.services.asset_resolver import AssetResolver
-
-
-def make_product_slug(product_model: Optional[str], color: str) -> str:
-    """
-    Generate product slug e.g. roadie-24-orange, tundra-45-white.
-    """
-    model_str = product_model or "Roadie 24"
-    clean_model = model_str.lower().replace("yeti", "").strip()
-    clean_model = re.sub(r"[^a-z0-9]+", "-", clean_model).strip("-")
-    if not clean_model:
-        clean_model = "cooler"
-    clean_color = color.lower().strip()
-    if clean_color in clean_model:
-        return clean_model
-    return f"{clean_model}-{clean_color}"
-
-
-def make_audience_slug(audience_name: str) -> str:
-    """
-    Generate slug from audience name e.g. "Westwood College Tailgaters" -> "westwood-college".
-    """
-    slug = re.sub(r"[^a-z0-9]+", "-", audience_name.lower()).strip("-")
-    if slug.endswith("-tailgaters"):
-        slug = slug[:-11]
-    return slug
-
-
-class ConceptPlanner:
-    """
-    Plans immutable audience concepts and deterministic 3-ratio format render plans.
-    Guarantees that randomization occurs exactly once per audience concept (not per ratio).
-    """
-
-    def __init__(self, asset_resolver: Optional[AssetResolver] = None):
-        self.resolver = asset_resolver or AssetResolver()
-
-    def plan_campaign(
-        self,
-        brief: CampaignBrief,
-        seed: Optional[int] = None,
-        prior_manifest: Optional[Dict[str, Any]] = None,
-    ) -> CampaignPlanResult:
-        """
-        Generate AudienceConcepts and FormatRenderPlans based on brief configuration.
-        """
-        if not brief.audiences:
-            raise ValueError("Brief must contain at least 1 audience.")
-
-
-        # 1. Deterministic Random Generator Setup
-        effective_seed = seed if seed is not None else brief.generation.seed
-        if effective_seed is None:
-            effective_seed = random.randint(100000, 999999)
-
-        rng = random.Random(effective_seed)
-
-        # 2. Build Lookup Maps for Background and Tagline Pools
-        bg_pool_map = {pool.id: pool for pool in brief.backgroundPools}
-        tagline_pool_map = {pool.id: pool for pool in brief.taglinePools}
-
-        # 3. Repeat Protection State
-        current_run_bg_usage: Dict[str, int] = defaultdict(int)
-        current_run_tagline_usage: Dict[str, int] = defaultdict(int)
-        warnings: List[str] = []
-
-        # Previous manifest mapping: audience_id -> { "background": path, "tagline": text }
-        prior_audience_choices: Dict[str, Dict[str, str]] = {}
-        if prior_manifest and "concepts" in prior_manifest:
-            for item in prior_manifest.get("concepts", []):
-                aid = item.get("audience_id")
-                if aid:
-                    prior_audience_choices[aid] = {
-                        "background": item.get("selected_background_path", ""),
-                        "tagline": item.get("selected_tagline_text", ""),
-                    }
-
-        concepts: List[AudienceConcept] = []
-        render_plans: List[FormatRenderPlan] = []
-
-        # 4. Plan Audience Groups
-        concepts_per_aud = brief.generation.conceptsPerAudience or 1
-
-        for audience in brief.audiences:
-            for c_idx in range(concepts_per_aud):
-                c_suffix = f"-v{c_idx+1}" if concepts_per_aud > 1 else ""
-                concept_id = f"concept-{brief.campaign.id}-{audience.id}{c_suffix}-{effective_seed}"
-
-                # Step A: Age Band -> Product Color Resolution
-                if audience.age.maximum <= 24:
-                    product_role = "product_orange"
-                    product_res = self.resolver.resolve_role("product_orange")
-                elif audience.age.minimum >= 25:
-                    product_role = "product_white"
-                    product_res = self.resolver.resolve_role("product_white")
-                else:
-                    raise ValueError(
-                        f"Audience {audience.id} age range ({audience.age.minimum}-{audience.age.maximum}) crosses demographic boundary."
-                    )
-
-                # Step B: Activity -> Background Pool & Selection with Repeat Protection
-                bg_pool = bg_pool_map.get(audience.backgroundPoolId)
-                if not bg_pool:
-                    raise ValueError(f"Background pool '{audience.backgroundPoolId}' not found in brief.")
-
-                pool_bgs = bg_pool.assets
-                if not pool_bgs:
-                    # Empty asset pool: mark for automatic Gemini AI generation in pipeline Stage 5
-                    selected_bg = f"outputs/generated-backgrounds/{audience.activity}-{audience.id}-pending.png"
-                else:
-                    # Filter against prior manifest if alternative options exist
-                    prev_bg = prior_audience_choices.get(audience.id, {}).get("background")
-                    eligible_bgs = [bg for bg in pool_bgs if bg != prev_bg] if len(pool_bgs) > 1 and prev_bg else pool_bgs
-
-                    # Current run least-recently-used selection
-                    min_usage = min(current_run_bg_usage[bg] for bg in eligible_bgs)
-                    least_used_bgs = [bg for bg in eligible_bgs if current_run_bg_usage[bg] == min_usage]
-
-                    # Deterministic selection from least-used
-                    selected_bg = rng.choice(least_used_bgs)
-
-                    if current_run_bg_usage[selected_bg] > 0:
-                        warnings.append(
-                            f"Pool '{audience.backgroundPoolId}' exhausted: background '{selected_bg}' reused for audience {audience.id}."
-                        )
-                    current_run_bg_usage[selected_bg] += 1
-
-                # Step C: Activity -> Tagline Asset & Text Selection
-                tag_pool = tagline_pool_map.get(audience.taglinePoolId)
-                if not tag_pool:
-                    raise ValueError(f"Tagline pool '{audience.taglinePoolId}' not found in brief.")
-
-                pool_tags = tag_pool.taglines
-                prev_tag = prior_audience_choices.get(audience.id, {}).get("tagline")
-                eligible_tags = [t for t in pool_tags if t != prev_tag] if len(pool_tags) > 1 and prev_tag else pool_tags
-
-                min_tag_usage = min(current_run_tagline_usage[t] for t in eligible_tags)
-                least_used_tags = [t for t in eligible_tags if current_run_tagline_usage[t] == min_tag_usage]
-                selected_tag_text = rng.choice(least_used_tags)
-                current_run_tagline_usage[selected_tag_text] += 1
-
-                # Activity Color & Tagline Asset
-                if audience.activity in ["beach", "surfing"]:
-                    tagline_color_hex = "#000000"
-                    tagline_res = self.resolver.resolve_role("tagline_black")
-                else:
-                    tagline_color_hex = "#FFFFFF"
-                    tagline_res = self.resolver.resolve_role("tagline_white")
-
-
-                # Step D: Brand Logo (Crisp white wordmark)
-                logo_res = self.resolver.resolve_logo_for_activity(audience.activity)
-
-                # Step E: Construct Immutable AudienceConcept
-                product_model = getattr(audience, "productModel", "YETI Roadie 24")
-                product_color = "orange" if audience.age.maximum <= 24 else "white"
-                product_slug = make_product_slug(product_model, product_color)
-                aud_slug = make_audience_slug(audience.name)
-
-                concept = AudienceConcept(
-                    concept_id=concept_id,
-                    audience_id=audience.id,
-                    audience_name=audience.name + (f" (Var {c_idx+1})" if concepts_per_aud > 1 else ""),
-                    age_band=audience.age.band,
-                    activity=audience.activity,
-                    territory=audience.territory,
-                    product_model=product_model,
-                    product_slug=product_slug,
-                    audience_slug=aud_slug,
-                    product_role=product_role,
-                    product_asset_path=product_res.resolved_path,
-                    background_pool_id=audience.backgroundPoolId,
-                    selected_background_path=selected_bg,
-                    tagline_pool_id=audience.taglinePoolId,
-                    selected_tagline_text=selected_tag_text,
-                    selected_tagline_asset_path=tagline_res.resolved_path,
-                    tagline_color_hex=tagline_color_hex,
-                    logo_asset_path=logo_res.resolved_path,
-                    seed_used=effective_seed,
-                )
-                concepts.append(concept)
-
-                # Step F: Expand Concept to Format Render Plans based on brief.outputFormats
-                for output_fmt in brief.outputFormats:
-                    ratio_name = output_fmt.aspectRatio
-                    if ratio_name not in LAYOUT_CONFIGS:
-                        continue
-                    layout_cfg = LAYOUT_CONFIGS[ratio_name]
-                    clean_ratio = ratio_name.replace(":", "x")
-                    plan_id = f"plan-{concept.concept_id}-{clean_ratio}"
-                    target_filename = f"{audience.id}_{aud_slug}{c_suffix}_{product_slug}_{clean_ratio}.png"
-
-                    render_plan = FormatRenderPlan(
-                        plan_id=plan_id,
-                        concept_id=concept.concept_id,
-                        audience_id=audience.id,
-                        aspect_ratio=ratio_name,
-                        output_dimensions=(layout_cfg.canvas_width, layout_cfg.canvas_height),
-                        target_filename=target_filename,
-                        product_slug=product_slug,
-                        product_asset_path=concept.product_asset_path,
-                        background_asset_path=concept.selected_background_path,
-                        tagline_asset_path=concept.selected_tagline_asset_path,
-                        tagline_text=concept.selected_tagline_text,
-                        tagline_color_hex=concept.tagline_color_hex,
-                        logo_asset_path=concept.logo_asset_path,
-                        layout_config=layout_cfg,
-                    )
-                    render_plans.append(render_plan)
-
-
-
-        return CampaignPlanResult(
-            campaign_id=brief.campaign.id,
-            seed=effective_seed,
-            total_audiences=len(concepts),
-            total_concepts=len(concepts),
-            total_render_plans=len(render_plans),
-            concepts=concepts,
-            render_plans=render_plans,
-            warnings=warnings,
         )
 ````
 
@@ -10088,6 +9848,246 @@ class AdCompositor:
         return canvas
 ````
 
+## File: backend/app/services/concept_planner.py
+````python
+"""Concept Planner for Multi-Audience Campaigns."""
+
+import random
+import re
+from typing import Dict, List, Optional, Any, Tuple
+from collections import defaultdict
+
+from backend.app.models.brief import CampaignBrief, Audience
+from backend.app.models.layout import LAYOUT_CONFIGS
+from backend.app.models.plan import (
+    AudienceConcept,
+    FormatRenderPlan,
+    CampaignPlanResult,
+)
+from backend.app.services.asset_resolver import AssetResolver
+
+
+def make_product_slug(product_model: Optional[str], color: str) -> str:
+    """
+    Generate product slug e.g. roadie-24-orange, tundra-45-white.
+    """
+    model_str = product_model or "Roadie 24"
+    clean_model = model_str.lower().replace("yeti", "").strip()
+    clean_model = re.sub(r"[^a-z0-9]+", "-", clean_model).strip("-")
+    if not clean_model:
+        clean_model = "cooler"
+    clean_color = color.lower().strip()
+    if clean_color in clean_model:
+        return clean_model
+    return f"{clean_model}-{clean_color}"
+
+
+def make_audience_slug(audience_name: str) -> str:
+    """
+    Generate slug from audience name e.g. "Westwood College Tailgaters" -> "westwood-college".
+    """
+    slug = re.sub(r"[^a-z0-9]+", "-", audience_name.lower()).strip("-")
+    if slug.endswith("-tailgaters"):
+        slug = slug[:-11]
+    return slug
+
+
+class ConceptPlanner:
+    """
+    Plans immutable audience concepts and deterministic 3-ratio format render plans.
+    Guarantees that randomization occurs exactly once per audience concept (not per ratio).
+    """
+
+    def __init__(self, asset_resolver: Optional[AssetResolver] = None):
+        self.resolver = asset_resolver or AssetResolver()
+
+    def plan_campaign(
+        self,
+        brief: CampaignBrief,
+        seed: Optional[int] = None,
+        prior_manifest: Optional[Dict[str, Any]] = None,
+    ) -> CampaignPlanResult:
+        """
+        Generate AudienceConcepts and FormatRenderPlans based on brief configuration.
+        """
+        if not brief.audiences:
+            raise ValueError("Brief must contain at least 1 audience.")
+
+
+        # 1. Deterministic Random Generator Setup
+        effective_seed = seed if seed is not None else brief.generation.seed
+        if effective_seed is None:
+            effective_seed = random.randint(100000, 999999)
+
+        rng = random.Random(effective_seed)
+
+        # 2. Build Lookup Maps for Background and Tagline Pools
+        bg_pool_map = {pool.id: pool for pool in brief.backgroundPools}
+        tagline_pool_map = {pool.id: pool for pool in brief.taglinePools}
+
+        # 3. Repeat Protection State
+        current_run_bg_usage: Dict[str, int] = defaultdict(int)
+        current_run_tagline_usage: Dict[str, int] = defaultdict(int)
+        warnings: List[str] = []
+
+        # Previous manifest mapping: audience_id -> { "background": path, "tagline": text }
+        prior_audience_choices: Dict[str, Dict[str, str]] = {}
+        if prior_manifest and "concepts" in prior_manifest:
+            for item in prior_manifest.get("concepts", []):
+                aid = item.get("audience_id")
+                if aid:
+                    prior_audience_choices[aid] = {
+                        "background": item.get("selected_background_path", ""),
+                        "tagline": item.get("selected_tagline_text", ""),
+                    }
+
+        concepts: List[AudienceConcept] = []
+        render_plans: List[FormatRenderPlan] = []
+
+        # 4. Plan Audience Groups
+        concepts_per_aud = brief.generation.conceptsPerAudience or 1
+
+        for audience in brief.audiences:
+            for c_idx in range(concepts_per_aud):
+                c_suffix = f"-v{c_idx+1}" if concepts_per_aud > 1 else ""
+                concept_id = f"concept-{brief.campaign.id}-{audience.id}{c_suffix}-{effective_seed}"
+
+                # Step A: Age Band -> Product Color Resolution
+                if audience.age.maximum <= 24:
+                    product_role = "product_orange"
+                    product_res = self.resolver.resolve_role("product_orange")
+                elif audience.age.minimum >= 25:
+                    product_role = "product_white"
+                    product_res = self.resolver.resolve_role("product_white")
+                else:
+                    raise ValueError(
+                        f"Audience {audience.id} age range ({audience.age.minimum}-{audience.age.maximum}) crosses demographic boundary."
+                    )
+
+                # Step B: Activity -> Background Pool & Selection with Repeat Protection
+                bg_pool = bg_pool_map.get(audience.backgroundPoolId)
+                if not bg_pool:
+                    raise ValueError(f"Background pool '{audience.backgroundPoolId}' not found in brief.")
+
+                pool_bgs = bg_pool.assets
+                if not pool_bgs:
+                    # Empty asset pool: mark for automatic Gemini AI generation in pipeline Stage 5
+                    selected_bg = f"outputs/generated-backgrounds/{audience.activity}-{audience.id}-pending.png"
+                else:
+                    # Filter against prior manifest if alternative options exist
+                    prev_bg = prior_audience_choices.get(audience.id, {}).get("background")
+                    eligible_bgs = [bg for bg in pool_bgs if bg != prev_bg] if len(pool_bgs) > 1 and prev_bg else pool_bgs
+
+                    # Current run least-recently-used selection
+                    min_usage = min(current_run_bg_usage[bg] for bg in eligible_bgs)
+                    least_used_bgs = [bg for bg in eligible_bgs if current_run_bg_usage[bg] == min_usage]
+
+                    # Deterministic selection from least-used
+                    selected_bg = rng.choice(least_used_bgs)
+
+                    if current_run_bg_usage[selected_bg] > 0:
+                        warnings.append(
+                            f"Pool '{audience.backgroundPoolId}' exhausted: background '{selected_bg}' reused for audience {audience.id}."
+                        )
+                    current_run_bg_usage[selected_bg] += 1
+
+                # Step C: Activity -> Tagline Asset & Text Selection
+                tag_pool = tagline_pool_map.get(audience.taglinePoolId)
+                if not tag_pool:
+                    raise ValueError(f"Tagline pool '{audience.taglinePoolId}' not found in brief.")
+
+                pool_tags = tag_pool.taglines
+                prev_tag = prior_audience_choices.get(audience.id, {}).get("tagline")
+                eligible_tags = [t for t in pool_tags if t != prev_tag] if len(pool_tags) > 1 and prev_tag else pool_tags
+
+                min_tag_usage = min(current_run_tagline_usage[t] for t in eligible_tags)
+                least_used_tags = [t for t in eligible_tags if current_run_tagline_usage[t] == min_tag_usage]
+                selected_tag_text = rng.choice(least_used_tags)
+                current_run_tagline_usage[selected_tag_text] += 1
+
+                # Activity Color & Tagline Asset
+                if audience.activity in ["beach", "surfing"]:
+                    tagline_color_hex = "#000000"
+                    tagline_res = self.resolver.resolve_role("tagline_black")
+                else:
+                    tagline_color_hex = "#FFFFFF"
+                    tagline_res = self.resolver.resolve_role("tagline_white")
+
+
+                # Step D: Brand Logo (Crisp white wordmark)
+                logo_res = self.resolver.resolve_logo_for_activity(audience.activity)
+
+                # Step E: Construct Immutable AudienceConcept
+                product_model = getattr(audience, "productModel", "YETI Roadie 24")
+                product_color = "orange" if audience.age.maximum <= 24 else "white"
+                product_slug = make_product_slug(product_model, product_color)
+                aud_slug = make_audience_slug(audience.name)
+
+                concept = AudienceConcept(
+                    concept_id=concept_id,
+                    audience_id=audience.id,
+                    audience_name=audience.name + (f" (Var {c_idx+1})" if concepts_per_aud > 1 else ""),
+                    age_band=audience.age.band,
+                    activity=audience.activity,
+                    territory=audience.territory,
+                    product_model=product_model,
+                    product_slug=product_slug,
+                    audience_slug=aud_slug,
+                    product_role=product_role,
+                    product_asset_path=product_res.resolved_path,
+                    background_pool_id=audience.backgroundPoolId,
+                    selected_background_path=selected_bg,
+                    tagline_pool_id=audience.taglinePoolId,
+                    selected_tagline_text=selected_tag_text,
+                    selected_tagline_asset_path=tagline_res.resolved_path,
+                    tagline_color_hex=tagline_color_hex,
+                    logo_asset_path=logo_res.resolved_path,
+                    seed_used=effective_seed,
+                )
+                concepts.append(concept)
+
+                # Step F: Expand Concept to Format Render Plans based on brief.outputFormats
+                for output_fmt in brief.outputFormats:
+                    ratio_name = output_fmt.aspectRatio
+                    if ratio_name not in LAYOUT_CONFIGS:
+                        continue
+                    layout_cfg = LAYOUT_CONFIGS[ratio_name]
+                    clean_ratio = ratio_name.replace(":", "x")
+                    plan_id = f"plan-{concept.concept_id}-{clean_ratio}"
+                    target_filename = f"{audience.id}_{aud_slug}{c_suffix}_{product_slug}_{clean_ratio}.png"
+
+                    render_plan = FormatRenderPlan(
+                        plan_id=plan_id,
+                        concept_id=concept.concept_id,
+                        audience_id=audience.id,
+                        aspect_ratio=ratio_name,
+                        output_dimensions=(layout_cfg.canvas_width, layout_cfg.canvas_height),
+                        target_filename=target_filename,
+                        product_slug=product_slug,
+                        product_asset_path=concept.product_asset_path,
+                        background_asset_path=concept.selected_background_path,
+                        tagline_asset_path=concept.selected_tagline_asset_path,
+                        tagline_text=concept.selected_tagline_text,
+                        tagline_color_hex=concept.tagline_color_hex,
+                        logo_asset_path=concept.logo_asset_path,
+                        layout_config=layout_cfg,
+                    )
+                    render_plans.append(render_plan)
+
+
+
+        return CampaignPlanResult(
+            campaign_id=brief.campaign.id,
+            seed=effective_seed,
+            total_audiences=len(concepts),
+            total_concepts=len(concepts),
+            total_render_plans=len(render_plans),
+            concepts=concepts,
+            render_plans=render_plans,
+            warnings=warnings,
+        )
+````
+
 ## File: frontend/public/samples/yeti-la-go-anywhere-2026.json
 ````json
 {
@@ -10944,47 +10944,6 @@ class AdCompositor:
 }
 ````
 
-## File: frontend/src/components/GenerateAction.tsx
-````typescript
-import React from 'react';
-
-interface GenerateActionProps {
-  isValid: boolean;
-  totalOutputs: number;
-  isGenerating?: boolean;
-  onGenerateClick?: () => void;
-}
-
-export const GenerateAction: React.FC<GenerateActionProps> = ({
-  isValid,
-  totalOutputs: _totalOutputs,
-  isGenerating = false,
-  onGenerateClick,
-}) => {
-  return (
-    <section className="generate-action-section" aria-label="Campaign generation trigger">
-      <button
-        type="button"
-        className="btn-generate"
-        disabled={!isValid || isGenerating}
-        onClick={onGenerateClick}
-        aria-describedby="generate-subtext"
-      >
-        <span className="btn-generate-main">
-          {isGenerating ? 'GENERATING ADS...' : 'GENERATE ADS'}
-        </span>
-        <span id="generate-subtext" className="btn-generate-sub">
-          Deterministic multi-format adaptation across target aspect ratios
-        </span>
-      </button>
-    </section>
-
-
-
-  );
-};
-````
-
 ## File: backend/app/models/brief.py
 ````python
 """Pydantic models and strict validation contract for YETI campaign brief."""
@@ -11317,6 +11276,47 @@ class CampaignBriefModel(BaseModel):
 CampaignBrief = CampaignBriefModel
 ````
 
+## File: frontend/src/components/GenerateAction.tsx
+````typescript
+import React from 'react';
+
+interface GenerateActionProps {
+  isValid: boolean;
+  totalOutputs: number;
+  isGenerating?: boolean;
+  onGenerateClick?: () => void;
+}
+
+export const GenerateAction: React.FC<GenerateActionProps> = ({
+  isValid,
+  totalOutputs: _totalOutputs,
+  isGenerating = false,
+  onGenerateClick,
+}) => {
+  return (
+    <section className="generate-action-section" aria-label="Campaign generation trigger">
+      <button
+        type="button"
+        className="btn-generate"
+        disabled={!isValid || isGenerating}
+        onClick={onGenerateClick}
+        aria-describedby="generate-subtext"
+      >
+        <span className="btn-generate-main">
+          {isGenerating ? 'GENERATING ADS...' : 'GENERATE ADS'}
+        </span>
+        <span id="generate-subtext" className="btn-generate-sub">
+          Deterministic multi-format adaptation across target aspect ratios
+        </span>
+      </button>
+    </section>
+
+
+
+  );
+};
+````
+
 ## File: frontend/src/App.test.tsx
 ````typescript
 // @vitest-environment jsdom
@@ -11421,6 +11421,178 @@ describe('YETI Ad Generator UI', () => {
 });
 ````
 
+## File: backend/app/main.py
+````python
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env
+load_dotenv(override=True)
+
+from fastapi import FastAPI, Body, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from typing import Dict, Any, Optional
+
+from backend.app.models.brief import CampaignBriefModel
+from backend.app.models.assets import AssetReadinessReport
+from backend.app.services.brief_validator import validate_brief_dict
+from backend.app.services.asset_resolver import AssetResolver
+
+
+app = FastAPI(
+    title="YETI Ad Generator API",
+    description="Creative Automation backend for scalable social campaigns.",
+    version="1.0.0",
+)
+
+# CORS middleware for local Vite frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+resolver = AssetResolver()
+
+
+@app.get("/api/health")
+def health_check():
+    return {"status": "ok", "app": "YETI Ad Generator", "version": "1.0.0"}
+
+
+@app.get("/api/assets/readiness", response_model=AssetReadinessReport)
+def get_asset_readiness():
+    """Returns a truthful readiness report for all required assets."""
+    report = resolver.generate_readiness_report()
+    return report
+
+
+from backend.app.services.storage import get_storage_adapter, StorageStatus
+
+@app.get("/api/storage/status", response_model=StorageStatus)
+def get_storage_status():
+    """Returns storage status (configured/reachable) without leaking secrets."""
+    adapter = get_storage_adapter()
+    return adapter.get_status()
+
+
+@app.get("/api/integrations/status")
+def get_integrations_status():
+    """Returns live readiness for Storage and Gemini AI scene provider."""
+    storage_adapter = get_storage_adapter()
+    gemini_gen = GeminiBackgroundGenerator()
+    return {
+        "storage": storage_adapter.get_status().model_dump(),
+        "gemini": {
+            "configured": gemini_gen.is_configured(),
+            "model": gemini_gen.model_name,
+            "status": "active" if gemini_gen.is_configured() else "standby",
+        }
+    }
+
+
+
+@app.post("/api/brief/validate")
+def validate_brief_endpoint(brief: Dict[str, Any] = Body(...)):
+    """Validates campaign brief against strict contract."""
+    is_valid, model, errors = validate_brief_dict(brief)
+    return {
+        "isValid": is_valid,
+        "errors": errors,
+        "audienceCount": len(model.audiences) if model else 0,
+        "formatCount": len(model.outputFormats) if model else 0,
+        "totalOutputs": model.generation.totalOutputsPerRun if model else 0,
+    }
+
+
+from backend.app.models.plan import CampaignPlanResult
+from backend.app.services.concept_planner import ConceptPlanner
+
+planner = ConceptPlanner(resolver)
+
+
+@app.post("/api/campaign/plan", response_model=CampaignPlanResult)
+def plan_campaign_endpoint(
+    brief: Dict[str, Any] = Body(...),
+    seed: Optional[int] = None,
+):
+    """Plans 6 immutable audience concepts and 18 deterministic format render plans."""
+    is_valid, model, errors = validate_brief_dict(brief)
+    if not is_valid or model is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"message": "Invalid campaign brief", "errors": errors},
+        )
+
+    try:
+        plan_result = planner.plan_campaign(model, seed=seed)
+        return plan_result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+from backend.app.models.generation import GeneratedBackgroundMetadata, GenerationRequest
+from backend.app.services.gemini_generator import GeminiBackgroundGenerator
+
+generator = GeminiBackgroundGenerator()
+
+
+@app.post("/api/backgrounds/generate", response_model=GeneratedBackgroundMetadata)
+def generate_background_endpoint(req: GenerationRequest = Body(...)):
+    """Generates a missing background using Gemini or deterministic mock provider."""
+    try:
+        bg_meta = generator.generate_background(
+            activity=req.activity,
+            territory=req.territory,
+            custom_prompt_suffix=req.custom_prompt_suffix,
+            force_mock=req.force_mock,
+        )
+        return bg_meta
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+from fastapi.responses import FileResponse
+from backend.app.models.pipeline import CampaignRunResult
+from backend.app.services.pipeline_runner import CampaignPipelineRunner
+
+runner = CampaignPipelineRunner()
+
+
+@app.post("/api/campaign/generate", response_model=CampaignRunResult)
+def generate_campaign_endpoint(
+    brief: Dict[str, Any] = Body(...),
+    seed: Optional[int] = None,
+):
+    """Executes end-to-end 18-ad campaign generation pipeline."""
+    try:
+        run_result = runner.execute_campaign(brief_dict=brief, seed=seed)
+        return run_result
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+
+
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+
+# Ensure outputs directory exists
+Path("outputs").mkdir(parents=True, exist_ok=True)
+
+# Mount static files to serve generated ads, contact sheets, and zip archives
+app.mount("/api/outputs", StaticFiles(directory="outputs", check_dir=False), name="outputs")
+
+
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
+````
+
 ## File: README.md
 ````markdown
 # YETI Los Angeles Multi-Format Creative Ad Generator (2026)
@@ -11458,15 +11630,14 @@ The project demonstrates how a repeatable creative-production system turns one a
 | **Three aspect ratios** | `1:1`, `16:9`, and `9:16` at exact dimensions | **Satisfied** |
 | **Campaign message on ads** | Controlled vector tagline assets and campaign messaging | **Satisfied** |
 | **Run locally** | CLI plus a complete React/FastAPI application | **Exceeded** |
-| **Organized output folders** | Run → product → aspect ratio, plus ZIP and contact sheet | **Mostly satisfied²** |
+| **Organized output folders** | Organized strictly by product and aspect ratio (`products/{product_slug}/{aspect_ratio}/`), plus ZIP and contact sheet | **Satisfied** |
 | **README** | Setup, architecture, examples, and limitations | **Exceeded** |
 | **Demo video** | Completed and delivered | **Satisfied** |
 | **Brand checks** | Eight deterministic blocking checks and asset hashes | **Bonus achieved** |
 | **Logging/reporting** | Manifest, JSON report, JSONL log, and provenance | **Bonus achieved** |
 | **Legal word checks** | No prohibited-word checker implemented | *Optional; not implemented* |
 
-> ¹ The two product SKUs are represented by two packshot assets (orange and white). Model metadata (Roadie 24 / Tundra 45) lives in the brief, not in distinct photography per model.  
-> ² Output folder naming is deterministic but audience folder IDs are positional per brief (see [§19](#19-output-directory-structure--hierarchy-overview)).
+> ¹ The two product SKUs are represented by two packshot assets (orange and white). Model metadata (Roadie 24 / Tundra 45) lives in the brief, not in distinct photography per model. (See [§19](#19-output-directory-structure--hierarchy-overview)).
 
 ---
 
@@ -12023,360 +12194,6 @@ outputs/
    - Download the full package ZIP or open the Dropbox backup folder.
 ````
 
-## File: backend/app/main.py
-````python
-import os
-from dotenv import load_dotenv
-
-# Load environment variables from .env
-load_dotenv(override=True)
-
-from fastapi import FastAPI, Body, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, Any, Optional
-
-from backend.app.models.brief import CampaignBriefModel
-from backend.app.models.assets import AssetReadinessReport
-from backend.app.services.brief_validator import validate_brief_dict
-from backend.app.services.asset_resolver import AssetResolver
-
-
-app = FastAPI(
-    title="YETI Ad Generator API",
-    description="Creative Automation backend for scalable social campaigns.",
-    version="1.0.0",
-)
-
-# CORS middleware for local Vite frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-resolver = AssetResolver()
-
-
-@app.get("/api/health")
-def health_check():
-    return {"status": "ok", "app": "YETI Ad Generator", "version": "1.0.0"}
-
-
-@app.get("/api/assets/readiness", response_model=AssetReadinessReport)
-def get_asset_readiness():
-    """Returns a truthful readiness report for all required assets."""
-    report = resolver.generate_readiness_report()
-    return report
-
-
-from backend.app.services.storage import get_storage_adapter, StorageStatus
-
-@app.get("/api/storage/status", response_model=StorageStatus)
-def get_storage_status():
-    """Returns storage status (configured/reachable) without leaking secrets."""
-    adapter = get_storage_adapter()
-    return adapter.get_status()
-
-
-@app.get("/api/integrations/status")
-def get_integrations_status():
-    """Returns live readiness for Storage and Gemini AI scene provider."""
-    storage_adapter = get_storage_adapter()
-    gemini_gen = GeminiBackgroundGenerator()
-    return {
-        "storage": storage_adapter.get_status().model_dump(),
-        "gemini": {
-            "configured": gemini_gen.is_configured(),
-            "model": gemini_gen.model_name,
-            "status": "active" if gemini_gen.is_configured() else "standby",
-        }
-    }
-
-
-
-@app.post("/api/brief/validate")
-def validate_brief_endpoint(brief: Dict[str, Any] = Body(...)):
-    """Validates campaign brief against strict contract."""
-    is_valid, model, errors = validate_brief_dict(brief)
-    return {
-        "isValid": is_valid,
-        "errors": errors,
-        "audienceCount": len(model.audiences) if model else 0,
-        "formatCount": len(model.outputFormats) if model else 0,
-        "totalOutputs": model.generation.totalOutputsPerRun if model else 0,
-    }
-
-
-from backend.app.models.plan import CampaignPlanResult
-from backend.app.services.concept_planner import ConceptPlanner
-
-planner = ConceptPlanner(resolver)
-
-
-@app.post("/api/campaign/plan", response_model=CampaignPlanResult)
-def plan_campaign_endpoint(
-    brief: Dict[str, Any] = Body(...),
-    seed: Optional[int] = None,
-):
-    """Plans 6 immutable audience concepts and 18 deterministic format render plans."""
-    is_valid, model, errors = validate_brief_dict(brief)
-    if not is_valid or model is None:
-        raise HTTPException(
-            status_code=400,
-            detail={"message": "Invalid campaign brief", "errors": errors},
-        )
-
-    try:
-        plan_result = planner.plan_campaign(model, seed=seed)
-        return plan_result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-from backend.app.models.generation import GeneratedBackgroundMetadata, GenerationRequest
-from backend.app.services.gemini_generator import GeminiBackgroundGenerator
-
-generator = GeminiBackgroundGenerator()
-
-
-@app.post("/api/backgrounds/generate", response_model=GeneratedBackgroundMetadata)
-def generate_background_endpoint(req: GenerationRequest = Body(...)):
-    """Generates a missing background using Gemini or deterministic mock provider."""
-    try:
-        bg_meta = generator.generate_background(
-            activity=req.activity,
-            territory=req.territory,
-            custom_prompt_suffix=req.custom_prompt_suffix,
-            force_mock=req.force_mock,
-        )
-        return bg_meta
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-from fastapi.responses import FileResponse
-from backend.app.models.pipeline import CampaignRunResult
-from backend.app.services.pipeline_runner import CampaignPipelineRunner
-
-runner = CampaignPipelineRunner()
-
-
-@app.post("/api/campaign/generate", response_model=CampaignRunResult)
-def generate_campaign_endpoint(
-    brief: Dict[str, Any] = Body(...),
-    seed: Optional[int] = None,
-):
-    """Executes end-to-end 18-ad campaign generation pipeline."""
-    try:
-        run_result = runner.execute_campaign(brief_dict=brief, seed=seed)
-        return run_result
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
-
-
-from pathlib import Path
-from fastapi.staticfiles import StaticFiles
-
-# Ensure outputs directory exists
-Path("outputs").mkdir(parents=True, exist_ok=True)
-
-# Mount static files to serve generated ads, contact sheets, and zip archives
-app.mount("/api/outputs", StaticFiles(directory="outputs", check_dir=False), name="outputs")
-
-
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
-````
-
-## File: frontend/src/services/api.ts
-````typescript
-import type { BriefValidationResult, CampaignBrief } from '../types/campaign';
-export type { CampaignBrief, BriefValidationResult };
-
-
-export interface ResolvedAssetInfo {
-  role: string;
-  logical_id: string;
-  resolved_path: string;
-  status: 'local' | 'cached_from_dropbox' | 'dropbox_available' | 'missing_gemini_eligible' | 'missing_blocking';
-  format_type?: string;
-  dimensions?: [number, number];
-  has_alpha: boolean;
-  size_bytes: number;
-  sha256_hash?: string;
-  is_blocking: boolean;
-  error_message?: string;
-}
-
-export interface AssetReadinessReport {
-  is_ready_to_generate: boolean;
-  blocking_missing_count: number;
-  gemini_eligible_missing_count: number;
-  assets: Record<string, ResolvedAssetInfo>;
-  summary_messages: string[];
-}
-
-const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL ? String(import.meta.env.VITE_API_URL).replace(/\/$/, '') : '');
-
-export async function fetchAssetReadiness(): Promise<AssetReadinessReport | null> {
-  try {
-    const res = await fetch(`${API_BASE}/api/assets/readiness`);
-    if (!res.ok) {
-      throw new Error(`Server returned HTTP ${res.status}: ${res.statusText}`);
-    }
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
-
-export interface StorageStatus {
-  configured: boolean;
-  reachable: boolean;
-  mode: 'local' | 'dropbox';
-  root: string;
-  error?: string;
-}
-
-export interface IntegrationStatusResponse {
-  storage: StorageStatus;
-  gemini: {
-    configured: boolean;
-    model: string;
-    status: 'active' | 'standby';
-  };
-}
-
-export async function fetchIntegrationStatus(): Promise<IntegrationStatusResponse | null> {
-  try {
-    const res = await fetch(`${API_BASE}/api/integrations/status`);
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
-
-export interface GeneratedAdArtifact {
-  artifact_id: string;
-  concept_id: string;
-  audience_id: string;
-  audience_name: string;
-  activity: string;
-  territory: string;
-  age_band: string;
-  product_model?: string;
-  product_slug?: string;
-  audience_slug?: string;
-  product_color: 'orange' | 'white';
-  aspect_ratio: '1:1' | '16:9' | '9:16';
-  dimensions: [number, number];
-  filename: string;
-  local_path: string;
-  preview_url: string;
-  storage_path?: string;
-  filesize_bytes: number;
-  background_source: string;
-  human_review_required: boolean;
-}
-
-export interface AudienceConcept {
-  concept_id: string;
-  audience_id: string;
-  audience_name: string;
-  age_band: 'younger' | 'older';
-  activity: string;
-  territory: string;
-  product_model?: string;
-  product_slug?: string;
-  audience_slug?: string;
-  product_role: string;
-  product_asset_path: string;
-  background_pool_id: string;
-  selected_background_path: string;
-  tagline_pool_id: string;
-  selected_tagline_text: string;
-  selected_tagline_asset_path: string;
-  tagline_color_hex: string;
-  logo_asset_path: string;
-  seed_used: number;
-}
-
-export interface CampaignRunResult {
-  run_id: string;
-  campaign_id: string;
-  campaign_name: string;
-  seed: number;
-  status: 'success' | 'failed' | 'partial';
-  started_at: string;
-  completed_at: string;
-  duration_seconds: number;
-  total_concepts: number;
-  total_outputs: number;
-  concepts: AudienceConcept[];
-  ads: GeneratedAdArtifact[];
-  contact_sheet_local_path?: string;
-  contact_sheet_preview_url?: string;
-  zip_bundle_local_path?: string;
-  zip_bundle_download_url?: string;
-  storage_mode: string;
-  storage_root?: string;
-  dropbox_folder_path?: string;
-  dropbox_shared_link?: string;
-  quality_report?: any;
-  report_download_url?: string;
-  manifest_download_url?: string;
-  pipeline_log_url?: string;
-
-  provenance_summary: string;
-  gemini_used: boolean;
-  gemini_audiences: string[];
-  warnings: string[];
-  errors: string[];
-}
-
-
-export async function fetchStorageStatus(): Promise<StorageStatus | null> {
-  try {
-    const res = await fetch(`${API_BASE}/api/storage/status`);
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
-export async function generateCampaignAds(
-  briefData: any,
-  seed?: number | null,
-): Promise<CampaignRunResult> {
-  const endpoint = seed !== undefined && seed !== null ? `/api/campaign/generate?seed=${seed}` : '/api/campaign/generate';
-  const url = `${API_BASE}${endpoint}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(briefData),
-  });
-
-
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({ detail: `HTTP ${res.status}: ${res.statusText}` }));
-    throw new Error(errorData.detail || errorData.message || `Generation failed (${res.status})`);
-  }
-
-  return await res.json();
-}
-````
-
 ## File: yeti_la_random_ad_campaign.json
 ````json
 {
@@ -12807,6 +12624,188 @@ export async function generateCampaignAds(
     "writeManifest": true,
     "manifestFilename": "generation-manifest.json"
   }
+}
+````
+
+## File: frontend/src/services/api.ts
+````typescript
+import type { BriefValidationResult, CampaignBrief } from '../types/campaign';
+export type { CampaignBrief, BriefValidationResult };
+
+
+export interface ResolvedAssetInfo {
+  role: string;
+  logical_id: string;
+  resolved_path: string;
+  status: 'local' | 'cached_from_dropbox' | 'dropbox_available' | 'missing_gemini_eligible' | 'missing_blocking';
+  format_type?: string;
+  dimensions?: [number, number];
+  has_alpha: boolean;
+  size_bytes: number;
+  sha256_hash?: string;
+  is_blocking: boolean;
+  error_message?: string;
+}
+
+export interface AssetReadinessReport {
+  is_ready_to_generate: boolean;
+  blocking_missing_count: number;
+  gemini_eligible_missing_count: number;
+  assets: Record<string, ResolvedAssetInfo>;
+  summary_messages: string[];
+}
+
+const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL ? String(import.meta.env.VITE_API_URL).replace(/\/$/, '') : '');
+
+export async function fetchAssetReadiness(): Promise<AssetReadinessReport | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/assets/readiness`);
+    if (!res.ok) {
+      throw new Error(`Server returned HTTP ${res.status}: ${res.statusText}`);
+    }
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+
+export interface StorageStatus {
+  configured: boolean;
+  reachable: boolean;
+  mode: 'local' | 'dropbox';
+  root: string;
+  error?: string;
+}
+
+export interface IntegrationStatusResponse {
+  storage: StorageStatus;
+  gemini: {
+    configured: boolean;
+    model: string;
+    status: 'active' | 'standby';
+  };
+}
+
+export async function fetchIntegrationStatus(): Promise<IntegrationStatusResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/integrations/status`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+
+export interface GeneratedAdArtifact {
+  artifact_id: string;
+  concept_id: string;
+  audience_id: string;
+  audience_name: string;
+  activity: string;
+  territory: string;
+  age_band: string;
+  product_model?: string;
+  product_slug?: string;
+  audience_slug?: string;
+  product_color: 'orange' | 'white';
+  aspect_ratio: '1:1' | '16:9' | '9:16';
+  dimensions: [number, number];
+  filename: string;
+  local_path: string;
+  preview_url: string;
+  storage_path?: string;
+  filesize_bytes: number;
+  background_source: string;
+  human_review_required: boolean;
+}
+
+export interface AudienceConcept {
+  concept_id: string;
+  audience_id: string;
+  audience_name: string;
+  age_band: 'younger' | 'older';
+  activity: string;
+  territory: string;
+  product_model?: string;
+  product_slug?: string;
+  audience_slug?: string;
+  product_role: string;
+  product_asset_path: string;
+  background_pool_id: string;
+  selected_background_path: string;
+  tagline_pool_id: string;
+  selected_tagline_text: string;
+  selected_tagline_asset_path: string;
+  tagline_color_hex: string;
+  logo_asset_path: string;
+  seed_used: number;
+}
+
+export interface CampaignRunResult {
+  run_id: string;
+  campaign_id: string;
+  campaign_name: string;
+  seed: number;
+  status: 'success' | 'failed' | 'partial';
+  started_at: string;
+  completed_at: string;
+  duration_seconds: number;
+  total_concepts: number;
+  total_outputs: number;
+  concepts: AudienceConcept[];
+  ads: GeneratedAdArtifact[];
+  contact_sheet_local_path?: string;
+  contact_sheet_preview_url?: string;
+  zip_bundle_local_path?: string;
+  zip_bundle_download_url?: string;
+  storage_mode: string;
+  storage_root?: string;
+  dropbox_folder_path?: string;
+  dropbox_shared_link?: string;
+  quality_report?: any;
+  report_download_url?: string;
+  manifest_download_url?: string;
+  pipeline_log_url?: string;
+
+  provenance_summary: string;
+  gemini_used: boolean;
+  gemini_audiences: string[];
+  warnings: string[];
+  errors: string[];
+}
+
+
+export async function fetchStorageStatus(): Promise<StorageStatus | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/storage/status`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function generateCampaignAds(
+  briefData: any,
+  seed?: number | null,
+): Promise<CampaignRunResult> {
+  const endpoint = seed !== undefined && seed !== null ? `/api/campaign/generate?seed=${seed}` : '/api/campaign/generate';
+  const url = `${API_BASE}${endpoint}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(briefData),
+  });
+
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ detail: `HTTP ${res.status}: ${res.statusText}` }));
+    throw new Error(errorData.detail || errorData.message || `Generation failed (${res.status})`);
+  }
+
+  return await res.json();
 }
 ````
 
