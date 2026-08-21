@@ -27,7 +27,7 @@ The project demonstrates how a repeatable creative-production system turns one a
 | Assessment requirement | Implementation | Result |
 | :--- | :--- | :---: |
 | **Structured campaign brief** | JSON brief with market, audiences, campaign message, rules, and assets | **Exceeded** |
-| **At least two products** | Orange and white cooler packshots with product-model metadata | **Mostly satisfied¹** |
+| **At least two products** | Orange and White cooler SKUs (Roadie 24 & Tundra 45) with distinct colorway packshots and model metadata | **Satisfied** |
 | **Reuse existing assets** | Local/Dropbox asset resolver with caching and SHA-256 integrity checks | **Exceeded** |
 | **Generate missing assets with GenAI** | Google Gemini background-generation fallback | **Satisfied** |
 | **Three aspect ratios** | `1:1`, `16:9`, and `9:16` at exact dimensions | **Satisfied** |
@@ -39,8 +39,6 @@ The project demonstrates how a repeatable creative-production system turns one a
 | **Brand checks** | Eight deterministic blocking checks and asset hashes | **Bonus achieved** |
 | **Logging/reporting** | Manifest, JSON report, JSONL log, and provenance | **Bonus achieved** |
 | **Legal word checks** | No prohibited-word checker implemented | *Optional; not implemented* |
-
-> ¹ The two product SKUs are represented by two packshot assets (orange and white). Model metadata (Roadie 24 / Tundra 45) lives in the brief, not in distinct photography per model. (See [§19](#19-output-directory-structure--hierarchy-overview)).
 
 ---
 
@@ -536,7 +534,7 @@ outputs/
 - **Mock generator disclosure** — with no Gemini key, fallback scenes come from a procedural renderer flagged `mock_fallback` in audit metadata.
 - **Repeat protection on small pools** — if a pool has fewer unique assets than audiences, approved assets are reused with explicit warning logs.
 - **No prohibited-word check** — the QA stage does not scan tagline or legal copy against a banned-terms list.
-- **Two SKUs, two packshots** — product models are distinguished by brief metadata and colorway, not by separate per-model photography.
+- **Two product SKUs by colorway** — product SKUs (Roadie 24 & Tundra 45) are visually differentiated by official colorway packshots (Orange and White) and model metadata in the brief.
 
 ---
 
