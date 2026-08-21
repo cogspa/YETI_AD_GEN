@@ -75,6 +75,9 @@ export interface GeneratedAdArtifact {
   activity: string;
   territory: string;
   age_band: string;
+  product_model?: string;
+  product_slug?: string;
+  audience_slug?: string;
   product_color: 'orange' | 'white';
   aspect_ratio: '1:1' | '16:9' | '9:16';
   dimensions: [number, number];
@@ -94,6 +97,9 @@ export interface AudienceConcept {
   age_band: 'younger' | 'older';
   activity: string;
   territory: string;
+  product_model?: string;
+  product_slug?: string;
+  audience_slug?: string;
   product_role: string;
   product_asset_path: string;
   background_pool_id: string;

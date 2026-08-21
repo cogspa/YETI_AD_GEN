@@ -141,3 +141,13 @@ def test_randomization_occurs_once_per_audience_not_per_ratio(planner, brief):
         assert plan.background_asset_path == parent_concept.selected_background_path
         assert plan.product_asset_path == parent_concept.product_asset_path
         assert plan.tagline_asset_path == parent_concept.selected_tagline_asset_path
+
+
+def test_product_and_audience_slug_target_filenames(planner, brief):
+    """Verify target_filenames in render plans contain audience descriptor and product slug."""
+    result = planner.plan_campaign(brief, seed=42)
+    p01_plans = [p for p in result.render_plans if p.audience_id == "P01"]
+    assert len(p01_plans) == 3
+    p01_1x1 = next(p for p in p01_plans if p.aspect_ratio == "1:1")
+    assert p01_1x1.target_filename == "P01_westwood-college_roadie-24-orange_1x1.png"
+    assert p01_1x1.product_slug == "roadie-24-orange"

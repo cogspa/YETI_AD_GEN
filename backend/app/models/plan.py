@@ -13,6 +13,9 @@ class AudienceConcept(BaseModel):
     age_band: Literal["younger", "older"]
     activity: str
     territory: str
+    product_model: Optional[str] = None
+    product_slug: Optional[str] = None
+    audience_slug: Optional[str] = None
     product_role: str
     product_asset_path: str
     background_pool_id: str
@@ -33,6 +36,7 @@ class FormatRenderPlan(BaseModel):
     aspect_ratio: Literal["1:1", "16:9", "9:16"]
     output_dimensions: Tuple[int, int]
     target_filename: str
+    product_slug: Optional[str] = None
     product_asset_path: str
     background_asset_path: str
     tagline_asset_path: str

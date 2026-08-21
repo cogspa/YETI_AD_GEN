@@ -1,6 +1,7 @@
 """Concept Planner for Multi-Audience Campaigns."""
 
 import random
+import re
 from typing import Dict, List, Optional, Any, Tuple
 from collections import defaultdict
 
@@ -12,6 +13,31 @@ from backend.app.models.plan import (
     CampaignPlanResult,
 )
 from backend.app.services.asset_resolver import AssetResolver
+
+
+def make_product_slug(product_model: Optional[str], color: str) -> str:
+    """
+    Generate product slug e.g. roadie-24-orange, tundra-45-white.
+    """
+    model_str = product_model or "Roadie 24"
+    clean_model = model_str.lower().replace("yeti", "").strip()
+    clean_model = re.sub(r"[^a-z0-9]+", "-", clean_model).strip("-")
+    if not clean_model:
+        clean_model = "cooler"
+    clean_color = color.lower().strip()
+    if clean_color in clean_model:
+        return clean_model
+    return f"{clean_model}-{clean_color}"
+
+
+def make_audience_slug(audience_name: str) -> str:
+    """
+    Generate slug from audience name e.g. "Westwood College Tailgaters" -> "westwood-college".
+    """
+    slug = re.sub(r"[^a-z0-9]+", "-", audience_name.lower()).strip("-")
+    if slug.endswith("-tailgaters"):
+        slug = slug[:-11]
+    return slug
 
 
 class ConceptPlanner:
@@ -140,6 +166,11 @@ class ConceptPlanner:
                 logo_res = self.resolver.resolve_logo_for_activity(audience.activity)
 
                 # Step E: Construct Immutable AudienceConcept
+                product_model = getattr(audience, "productModel", "YETI Roadie 24")
+                product_color = "orange" if audience.age.maximum <= 24 else "white"
+                product_slug = make_product_slug(product_model, product_color)
+                aud_slug = make_audience_slug(audience.name)
+
                 concept = AudienceConcept(
                     concept_id=concept_id,
                     audience_id=audience.id,
@@ -147,6 +178,9 @@ class ConceptPlanner:
                     age_band=audience.age.band,
                     activity=audience.activity,
                     territory=audience.territory,
+                    product_model=product_model,
+                    product_slug=product_slug,
+                    audience_slug=aud_slug,
                     product_role=product_role,
                     product_asset_path=product_res.resolved_path,
                     background_pool_id=audience.backgroundPoolId,
@@ -168,7 +202,7 @@ class ConceptPlanner:
                     layout_cfg = LAYOUT_CONFIGS[ratio_name]
                     clean_ratio = ratio_name.replace(":", "x")
                     plan_id = f"plan-{concept.concept_id}-{clean_ratio}"
-                    target_filename = f"{audience.id}_{audience.activity}_{audience.age.band}{c_suffix}_{clean_ratio}.png"
+                    target_filename = f"{audience.id}_{aud_slug}{c_suffix}_{product_slug}_{clean_ratio}.png"
 
                     render_plan = FormatRenderPlan(
                         plan_id=plan_id,
@@ -177,6 +211,7 @@ class ConceptPlanner:
                         aspect_ratio=ratio_name,
                         output_dimensions=(layout_cfg.canvas_width, layout_cfg.canvas_height),
                         target_filename=target_filename,
+                        product_slug=product_slug,
                         product_asset_path=concept.product_asset_path,
                         background_asset_path=concept.selected_background_path,
                         tagline_asset_path=concept.selected_tagline_asset_path,

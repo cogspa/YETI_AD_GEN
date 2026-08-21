@@ -9,7 +9,7 @@ interface GenerateActionProps {
 
 export const GenerateAction: React.FC<GenerateActionProps> = ({
   isValid,
-  totalOutputs,
+  totalOutputs: _totalOutputs,
   isGenerating = false,
   onGenerateClick,
 }) => {

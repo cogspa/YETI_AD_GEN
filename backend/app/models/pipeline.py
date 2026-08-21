@@ -16,6 +16,9 @@ class GeneratedAdArtifact(BaseModel):
     activity: str
     territory: str
     age_band: str
+    product_model: Optional[str] = None
+    product_slug: Optional[str] = None
+    audience_slug: Optional[str] = None
     product_color: str
     aspect_ratio: Literal["1:1", "16:9", "9:16"]
     dimensions: Tuple[int, int]

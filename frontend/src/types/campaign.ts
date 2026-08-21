@@ -69,6 +69,7 @@ export interface CampaignBrief {
   generation?: {
     mode?: string;
     seed?: number | null;
+    conceptsPerAudience?: number;
     randomizeOncePerAudience?: boolean;
     renderAllFormatsFromSameConcept?: boolean;
     adsPerAudience?: number;

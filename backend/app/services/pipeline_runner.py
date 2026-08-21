@@ -17,7 +17,7 @@ from backend.app.models.plan import AudienceConcept, FormatRenderPlan
 from backend.app.models.pipeline import GeneratedAdArtifact, PipelineStageEvent, CampaignRunResult
 from backend.app.services.brief_validator import validate_brief_dict
 from backend.app.services.asset_resolver import AssetResolver
-from backend.app.services.concept_planner import ConceptPlanner
+from backend.app.services.concept_planner import ConceptPlanner, make_product_slug, make_audience_slug
 from backend.app.services.gemini_generator import GeminiBackgroundGenerator
 from backend.app.services.compositor import AdCompositor
 from backend.app.services.contact_sheet import generate_campaign_contact_sheet
@@ -174,8 +174,8 @@ class CampaignPipelineRunner:
         # Create output directories for this run
         run_dir = self.base_dir / brief_model.campaign.id / "runs" / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
-        ads_output_dir = run_dir / "outputs"
-        ads_output_dir.mkdir(parents=True, exist_ok=True)
+        products_output_dir = run_dir / "products"
+        products_output_dir.mkdir(parents=True, exist_ok=True)
 
         # Stage 6: Rendering adaptations
         emit_event(f"Rendering {total_ads} adaptations", 55, 0, f"Starting composite rendering for {len(plan_result.concepts)} concepts across {len(brief_model.outputFormats)} formats...", total=total_ads)
@@ -195,6 +195,9 @@ class CampaignPipelineRunner:
                     age_band=concept.age_band,
                     activity=concept.activity,
                     territory=concept.territory,
+                    product_model=concept.product_model,
+                    product_slug=concept.product_slug,
+                    audience_slug=concept.audience_slug,
                     product_role=concept.product_role,
                     product_asset_path=concept.product_asset_path,
                     background_pool_id=concept.background_pool_id,
@@ -208,16 +211,20 @@ class CampaignPipelineRunner:
                 )
             )
 
-            # Audience output folder
-            aud_dir = ads_output_dir / concept.audience_id
-            aud_dir.mkdir(parents=True, exist_ok=True)
+            product_slug = concept.product_slug or make_product_slug(concept.product_model, "orange" if "orange" in concept.product_role else "white")
+            aud_slug = concept.audience_slug or make_audience_slug(concept.audience_name)
+
+            # Product output folder
+            prod_dir = products_output_dir / product_slug
+            prod_dir.mkdir(parents=True, exist_ok=True)
 
             for output_fmt in brief_model.outputFormats:
                 ratio = output_fmt.aspectRatio
-                fmt_folder = aud_dir / ratio.replace(":", "x")
+                clean_ratio = ratio.replace(":", "x")
+                fmt_folder = prod_dir / clean_ratio
                 fmt_folder.mkdir(parents=True, exist_ok=True)
 
-                out_filename = f"{concept.audience_id}_{concept.activity}_{concept.age_band}_{ratio.replace(':', 'x')}.png"
+                out_filename = f"{concept.audience_id}_{aud_slug}_{product_slug}_{clean_ratio}.png"
                 out_path = fmt_folder / out_filename
 
                 # Open PIL images for compositing
@@ -244,19 +251,22 @@ class CampaignPipelineRunner:
                 # Relative path for serving
                 rel_path = str(out_path.relative_to(self.base_dir)).replace("\\", "/")
                 preview_url = f"/api/outputs/{rel_path}"
-                storage_path = f"campaigns/{brief_model.campaign.id}/runs/{run_id}/outputs/{concept.audience_id}/{ratio.replace(':', 'x')}/{out_filename}"
+                storage_path = f"campaigns/{brief_model.campaign.id}/runs/{run_id}/products/{product_slug}/{clean_ratio}/{out_filename}"
 
                 is_gemini_bg = concept.audience_id in gemini_audiences
                 bg_source = "gemini_generated" if is_gemini_bg else "approved_asset"
 
                 ad_artifact = GeneratedAdArtifact(
-                    artifact_id=f"ad-{concept.concept_id}-{ratio.replace(':', 'x')}",
+                    artifact_id=f"ad-{concept.concept_id}-{clean_ratio}",
                     concept_id=concept.concept_id,
                     audience_id=concept.audience_id,
                     audience_name=concept.audience_name,
                     activity=concept.activity,
                     territory=concept.territory,
                     age_band=concept.age_band,
+                    product_model=concept.product_model,
+                    product_slug=product_slug,
+                    audience_slug=aud_slug,
                     product_color="orange" if "orange" in concept.product_role else "white",
                     aspect_ratio=ratio,
                     dimensions=dims,
@@ -301,7 +311,9 @@ class CampaignPipelineRunner:
         zip_local_path = run_dir / f"{brief_model.campaign.id}_{run_id}_all_{total_ads}_ads.zip"
         with zipfile.ZipFile(zip_local_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             for ad in ads:
-                zf.write(ad.local_path, arcname=f"{ad.audience_id}/{ad.filename}")
+                clean_ratio = ad.aspect_ratio.replace(":", "x")
+                p_slug = ad.product_slug or make_product_slug(ad.product_model, ad.product_color)
+                zf.write(ad.local_path, arcname=f"products/{p_slug}/{clean_ratio}/{ad.filename}")
             zf.write(str(contact_sheet_local), arcname="contact-sheet.jpg")
 
         zip_rel_path = str(zip_local_path.relative_to(self.base_dir)).replace("\\", "/")
