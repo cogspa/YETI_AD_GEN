@@ -12942,11 +12942,10 @@ The ad count is dictated entirely by the brief: $\text{audiences} \times \text{c
 > **Short pitch:** “Go Anywhere with YETI” is a modular campaign and creative-automation prototype that converts a structured brief and approved brand assets into a quality-controlled family of product, audience, regional, and social-media ad variations.
 
 ### 🎬 Campaign Demo Video
-[![Watch the YETI Ad Generator Demo Walkthrough](https://img.youtube.com/vi/4KM4Y0BZxps/maxresdefault.jpg)](https://www.youtube.com/watch?v=4KM4Y0BZxps)
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/4KM4Y0BZxps?si=U6q0jJsY7aVcNo-t" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+[![Watch the YETI Ad Generator Demo Walkthrough](https://img.youtube.com/vi/4KM4Y0BZxps/hqdefault.jpg)](https://www.youtube.com/watch?v=4KM4Y0BZxps)
 
-*Direct Link: [Watch on YouTube](https://www.youtube.com/watch?v=4KM4Y0BZxps)*
+▶️ **[Click here to watch the full walkthrough on YouTube (4:08)](https://www.youtube.com/watch?v=4KM4Y0BZxps)**
 
 ---
 
