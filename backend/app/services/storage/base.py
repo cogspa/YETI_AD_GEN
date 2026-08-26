@@ -19,7 +19,7 @@ class StorageStatus(BaseModel):
     """Health and configuration status of the storage provider."""
     configured: bool
     reachable: bool
-    mode: str = Field(description="'local' or 'dropbox'")
+    mode: str = Field(description="'local', 'dropbox', or 'firebase'")
     root: str
     error: Optional[str] = None
 

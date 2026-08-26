@@ -24,7 +24,16 @@ export interface AssetReadinessReport {
   summary_messages: string[];
 }
 
-const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL ? String(import.meta.env.VITE_API_URL).replace(/\/$/, '') : '');
+export const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL ? String(import.meta.env.VITE_API_URL).replace(/\/$/, '') : '');
+
+export function resolveMediaUrl(url?: string | null): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
+    return url;
+  }
+  const clean = url.startsWith('/') ? url : `/${url}`;
+  return `${API_BASE}${clean}`;
+}
 
 export async function fetchAssetReadiness(): Promise<AssetReadinessReport | null> {
   try {
@@ -42,7 +51,7 @@ export async function fetchAssetReadiness(): Promise<AssetReadinessReport | null
 export interface StorageStatus {
   configured: boolean;
   reachable: boolean;
-  mode: 'local' | 'dropbox';
+  mode: 'local' | 'dropbox' | 'firebase';
   root: string;
   error?: string;
 }

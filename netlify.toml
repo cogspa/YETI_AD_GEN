@@ -5,6 +5,20 @@
   command = "npm run build"
   publish = "dist"
 
+# Proxy /api requests to live Google Cloud Run backend
+[[redirects]]
+  from = "/api/*"
+  to = "https://yeti-ad-backend-545916247776.us-central1.run.app/api/:splat"
+  status = 200
+  force = true
+
+# Proxy /outputs requests to live Google Cloud Run backend
+[[redirects]]
+  from = "/outputs/*"
+  to = "https://yeti-ad-backend-545916247776.us-central1.run.app/outputs/:splat"
+  status = 200
+  force = true
+
 # Redirect SPA routes to index.html for client-side routing
 [[redirects]]
   from = "/*"

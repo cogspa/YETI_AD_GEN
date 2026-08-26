@@ -20,11 +20,24 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS middleware for local Vite frontend
+# CORS middleware for local Vite frontend and Netlify deployments
+cors_origins_env = os.getenv("CORS_ORIGINS", "")
+allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "https://yeti-ad-generator.netlify.app",
+]
+if cors_origins_env:
+    for o in cors_origins_env.split(","):
+        if o.strip() and o.strip() not in allowed_origins:
+            allowed_origins.append(o.strip())
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -152,17 +165,56 @@ def generate_campaign_endpoint(
 
 
 from pathlib import Path
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, Response
 
 # Ensure outputs directory exists
 Path("outputs").mkdir(parents=True, exist_ok=True)
 
-# Mount static files to serve generated ads, contact sheets, and zip archives
-app.mount("/api/outputs", StaticFiles(directory="outputs", check_dir=False), name="outputs")
 
+@app.get("/api/outputs/{file_path:path}")
+def serve_output_file(file_path: str):
+    """
+    Serves output assets (ads, contact sheets, reports, zip archives) reliably
+    across multi-instance Cloud Run containers with local caching and cloud storage fallback.
+    """
+    clean_path = file_path.lstrip("/")
+    local_target = Path("outputs") / clean_path
 
+    # 1. Serve immediately if found on local disk
+    if local_target.exists() and local_target.is_file():
+        return FileResponse(
+            path=str(local_target),
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+
+    # 2. Resilient Cloud Storage Fallback (Dropbox / Firebase / GCS)
+    try:
+        storage = get_storage_adapter()
+        status = storage.get_status()
+        if status.configured:
+            # Check storage path: e.g. "campaigns/..." or fallback relative
+            remote_candidates = [
+                f"campaigns/{clean_path}",
+                clean_path,
+            ]
+            for candidate in remote_candidates:
+                try:
+                    if storage.exists(candidate):
+                        local_target.parent.mkdir(parents=True, exist_ok=True)
+                        storage.download(candidate, str(local_target))
+                        return FileResponse(
+                            path=str(local_target),
+                            headers={"Cache-Control": "public, max-age=86400"},
+                        )
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    raise HTTPException(status_code=404, detail=f"Output asset '{file_path}' not found.")
 
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
+

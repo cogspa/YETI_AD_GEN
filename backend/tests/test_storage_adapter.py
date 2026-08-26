@@ -197,8 +197,9 @@ def test_storage_factory_with_refresh_token(mock_dbx_class):
         "DROPBOX_REFRESH_TOKEN": "mock_refresh_token_xyz",
         "DROPBOX_APP_KEY": "mock_app_key_123",
         "DROPBOX_APP_SECRET": "mock_app_secret_456",
+        "STORAGE_MODE": "",
     }
-    with patch.dict(os.environ, env_vars):
+    with patch.dict(os.environ, env_vars, clear=True):
         adapter = get_storage_adapter()
         assert isinstance(adapter, DropboxStorageAdapter)
         mock_dbx_class.assert_called_with(
@@ -206,3 +207,35 @@ def test_storage_factory_with_refresh_token(mock_dbx_class):
             app_key="mock_app_key_123",
             app_secret="mock_app_secret_456",
         )
+
+
+def test_firebase_storage_adapter_initialization():
+    """Verify FirebaseStorageAdapter handles missing credentials and health status gracefully."""
+    from backend.app.services.storage.firebase_adapter import FirebaseStorageAdapter
+
+    # Unconfigured bucket
+    unconfigured = FirebaseStorageAdapter(bucket_name="")
+    status = unconfigured.get_status()
+    assert status.configured is False
+    assert status.mode == "firebase"
+    assert "FIREBASE_STORAGE_BUCKET is not set" in (status.error or "")
+
+    # Configured bucket with mock
+    adapter = FirebaseStorageAdapter(bucket_name="test-bucket.appspot.com")
+    assert adapter.bucket_name == "test-bucket.appspot.com"
+    assert adapter.get_shared_folder_link("runs/run-1") == "https://console.firebase.google.com/project/_/storage/test-bucket.appspot.com/files/~2Fruns/run-1"
+
+
+def test_storage_factory_firebase_mode():
+    """Verify get_storage_adapter returns FirebaseStorageAdapter when STORAGE_MODE is firebase."""
+    from backend.app.services.storage.firebase_adapter import FirebaseStorageAdapter
+
+    env_vars = {
+        "STORAGE_MODE": "firebase",
+        "FIREBASE_STORAGE_BUCKET": "test-yeti-bucket.appspot.com",
+    }
+    with patch.dict(os.environ, env_vars):
+        adapter = get_storage_adapter()
+        assert isinstance(adapter, FirebaseStorageAdapter)
+        assert adapter.bucket_name == "test-yeti-bucket.appspot.com"
+

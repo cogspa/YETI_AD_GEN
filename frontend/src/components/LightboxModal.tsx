@@ -1,5 +1,5 @@
 import React from 'react';
-import type { GeneratedAdArtifact } from '../services/api';
+import { type GeneratedAdArtifact, resolveMediaUrl } from '../services/api';
 
 interface LightboxModalProps {
   ad: GeneratedAdArtifact | null;
@@ -28,7 +28,7 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({ ad, onClose }) => 
         {/* Image Preview Container */}
         <div style={{ flex: '1 1 400px', backgroundColor: '#05090E', borderRadius: '8px', border: '1px solid #14202C', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '340px' }}>
           <img
-            src={ad.preview_url}
+            src={resolveMediaUrl(ad.preview_url)}
             alt={ad.filename}
             style={{ maxHeight: '65vh', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px', boxShadow: '0 8px 30px rgba(0, 0, 0, 0.8)' }}
           />
@@ -85,7 +85,7 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({ ad, onClose }) => 
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '16px' }}>
             <a
-              href={ad.preview_url}
+              href={resolveMediaUrl(ad.preview_url)}
               download={ad.filename}
               className="btn-zip-download"
               style={{ justifyContent: 'center' }}

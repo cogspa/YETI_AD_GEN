@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolveMediaUrl } from '../services/api';
 
 interface QualityReportModalProps {
   isOpen: boolean;
@@ -46,7 +47,7 @@ export const QualityReportModal: React.FC<QualityReportModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {manifestUrl && (
               <a
-                href={manifestUrl}
+                href={resolveMediaUrl(manifestUrl)}
                 download="generation-manifest.json"
                 className="btn-zip-download"
                 style={{ padding: '6px 12px', fontSize: '11px' }}
@@ -56,7 +57,7 @@ export const QualityReportModal: React.FC<QualityReportModalProps> = ({
             )}
             {reportUrl && (
               <a
-                href={reportUrl}
+                href={resolveMediaUrl(reportUrl)}
                 download="generation-report.json"
                 className="btn-contact-sheet-action"
                 style={{ padding: '6px 12px', fontSize: '11px' }}
@@ -66,7 +67,7 @@ export const QualityReportModal: React.FC<QualityReportModalProps> = ({
             )}
             {logUrl && (
               <a
-                href={logUrl}
+                href={resolveMediaUrl(logUrl)}
                 download="pipeline.log"
                 className="btn-contact-sheet-action"
                 style={{ padding: '6px 12px', fontSize: '11px' }}

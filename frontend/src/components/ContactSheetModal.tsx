@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolveMediaUrl } from '../services/api';
 
 interface ContactSheetModalProps {
   isOpen: boolean;
@@ -17,6 +18,8 @@ export const ContactSheetModal: React.FC<ContactSheetModalProps> = ({
 }) => {
   if (!isOpen || !contactSheetUrl) return null;
 
+  const fullContactSheetUrl = resolveMediaUrl(contactSheetUrl);
+
   return (
     <div className="modal-overlay-bg" onClick={onClose}>
       <div
@@ -34,12 +37,11 @@ export const ContactSheetModal: React.FC<ContactSheetModalProps> = ({
             <p style={{ color: '#7E93A7', fontSize: '11px', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
               {campaignName} | Run: {runId} | Master Multi-Format Overview
             </p>
-
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <a
-              href={contactSheetUrl}
+              href={fullContactSheetUrl}
               download="yeti_campaign_contact_sheet.jpg"
               className="btn-zip-download"
               style={{ padding: '6px 14px', fontSize: '11px' }}
@@ -55,7 +57,7 @@ export const ContactSheetModal: React.FC<ContactSheetModalProps> = ({
         {/* High-res Image Scrollable Area */}
         <div className="modal-content-area" style={{ backgroundColor: '#05090E', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
           <img
-            src={contactSheetUrl}
+            src={fullContactSheetUrl}
             alt="YETI Campaign Contact Sheet"
             style={{ maxWidth: '100%', height: 'auto', borderRadius: '6px', boxShadow: '0 10px 40px rgba(0, 0, 0, 0.8)' }}
           />

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { CampaignRunResult, GeneratedAdArtifact } from '../services/api';
+import { type CampaignRunResult, type GeneratedAdArtifact, resolveMediaUrl } from '../services/api';
 
 interface CampaignResultsViewProps {
   result: CampaignRunResult;
@@ -67,7 +67,7 @@ export const CampaignResultsView: React.FC<CampaignResultsViewProps> = ({
           {/* Action Buttons */}
           <div className="results-action-group">
             {result.zip_bundle_download_url && (
-              <a href={result.zip_bundle_download_url} download className="btn-zip-download">
+              <a href={resolveMediaUrl(result.zip_bundle_download_url)} download className="btn-zip-download">
                 <span>📥</span>
                 <span>DOWNLOAD ALL {result.total_outputs || result.ads.length} ADS (ZIP)</span>
               </a>
@@ -261,9 +261,10 @@ export const CampaignResultsView: React.FC<CampaignResultsViewProps> = ({
                         onClick={() => onOpenLightbox(ad)}
                       >
                         <img
-                          src={ad.preview_url}
+                          src={resolveMediaUrl(ad.preview_url)}
                           alt={ad.filename}
                           className="format-ad-img"
+                          loading="lazy"
                         />
                         <div className="format-hover-overlay">
                           <span className="format-hover-badge">
@@ -279,7 +280,7 @@ export const CampaignResultsView: React.FC<CampaignResultsViewProps> = ({
                         {Math.round(ad.filesize_bytes / 1024)} KB
                       </span>
                       <a
-                        href={ad.preview_url}
+                        href={resolveMediaUrl(ad.preview_url)}
                         download={ad.filename}
                         className="btn-png-download"
                       >
