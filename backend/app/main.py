@@ -27,13 +27,17 @@ from backend.app.services.asset_resolver import AssetResolver
 # - Port: Dynamically assigned via $PORT environment variable by Cloud Run.
 # ==============================================================================
 
+# FASTAPI USAGE (App Instance):
+# Initializes the primary FastAPI ASGI application instance with OpenAPI metadata.
 app = FastAPI(
     title="YETI Ad Generator API",
     description="Creative Automation backend for scalable social campaigns on Google Cloud Run.",
     version="1.0.0",
 )
 
-# CORS middleware for local Vite frontend, Netlify deployments, and Google Cloud Run
+# FASTAPI USAGE (CORS Middleware):
+# Registers CORSMiddleware to allow cross-origin requests from the React frontend
+# (both local dev servers and the deployed Netlify production domain).
 cors_origins_env = os.getenv("CORS_ORIGINS", "")
 allowed_origins = [
     "http://localhost:5173",
@@ -62,11 +66,15 @@ from backend.app.models.layout import LAYOUT_CONFIGS, LayoutPreviewRequest
 from backend.app.services.layout_preview import render_layout_preview
 
 
+# FASTAPI USAGE (GET Route): Returns canonical per-format layout configurations.
 @app.get("/api/layouts")
 def get_default_layouts():
     return {ratio: layout.model_dump() for ratio, layout in LAYOUT_CONFIGS.items()}
 
 
+# FASTAPI USAGE (POST Route & HTTPException):
+# Validates LayoutPreviewRequest Pydantic model and renders sample ad layout preview.
+# Raises HTTPException(status_code=400) if rendering fails.
 @app.post("/api/layout/preview")
 def preview_layout(request: LayoutPreviewRequest):
     try:
@@ -75,11 +83,15 @@ def preview_layout(request: LayoutPreviewRequest):
         raise HTTPException(status_code=400, detail="The sample layout could not be rendered. Check the approved preview assets.") from exc
 
 
+# FASTAPI USAGE (Health Check Route):
+# Lightweight monitoring probe used by container orchestrators and load balancers.
 @app.get("/api/health")
 def health_check():
     return {"status": "ok", "app": "YETI Ad Generator", "version": "1.0.0"}
 
 
+# FASTAPI USAGE (Response Model Serialization):
+# GET route returning AssetReadinessReport, automatically validated and serialized via response_model.
 @app.get("/api/assets/readiness", response_model=AssetReadinessReport)
 def get_asset_readiness():
     """Returns a truthful readiness report for all required assets."""
@@ -89,6 +101,8 @@ def get_asset_readiness():
 
 from backend.app.services.storage import get_storage_adapter, StorageStatus
 
+# FASTAPI USAGE (Response Model Serialization):
+# Returns current cloud storage adapter status (local vs dropbox vs firebase) using StorageStatus schema.
 @app.get("/api/storage/status", response_model=StorageStatus)
 def get_storage_status():
     """Returns storage status (configured/reachable) without leaking secrets."""
@@ -96,6 +110,8 @@ def get_storage_status():
     return adapter.get_status()
 
 
+# FASTAPI USAGE (Aggregated Status Route):
+# Combines storage adapter status and Gemini AI scene provider readiness.
 @app.get("/api/integrations/status")
 def get_integrations_status():
     """Returns live readiness for Storage and Gemini AI scene provider."""
@@ -111,7 +127,9 @@ def get_integrations_status():
     }
 
 
-
+# FASTAPI USAGE (Async Route & Exception Mapping):
+# Async POST endpoint validating user prompt text via BriefConversionRequest.
+# Maps BriefConversionError exceptions into appropriate HTTP status codes (422, 502, 503).
 @app.post("/api/brief/convert")
 async def convert_brief_endpoint(request: BriefConversionRequest):
     """Convert plain language to a validated draft, without rendering or uploading ads."""
@@ -121,6 +139,9 @@ async def convert_brief_endpoint(request: BriefConversionRequest):
         raise HTTPException(status_code=exc.status_code, detail={"message": str(exc), "errors": exc.errors}) from exc
 
 
+# FASTAPI USAGE (Body Injection):
+# Ingests arbitrary brief JSON using Body(...) for validation without throwing early 422s,
+# returning full diagnostic report with line-level validation errors.
 @app.post("/api/brief/validate")
 def validate_brief_endpoint(brief: Dict[str, Any] = Body(...)):
     """Validates campaign brief against strict contract."""
@@ -140,6 +161,9 @@ from backend.app.services.concept_planner import ConceptPlanner
 planner = ConceptPlanner(resolver)
 
 
+# FASTAPI USAGE (Concept Planning Route):
+# Ingests brief JSON and optional seed using Body(...), validates the brief,
+# and returns a typed CampaignPlanResult serialized via response_model.
 @app.post("/api/campaign/plan", response_model=CampaignPlanResult)
 def plan_campaign_endpoint(
     brief: Dict[str, Any] = Body(...),
@@ -166,6 +190,8 @@ from backend.app.services.gemini_generator import GeminiBackgroundGenerator
 generator = GeminiBackgroundGenerator()
 
 
+# FASTAPI USAGE (Generative AI Background Route):
+# Validates GenerationRequest schema and returns GeneratedBackgroundMetadata with provenance audit.
 @app.post("/api/backgrounds/generate", response_model=GeneratedBackgroundMetadata)
 def generate_background_endpoint(req: GenerationRequest = Body(...)):
     """Generates a missing background using Gemini or deterministic mock provider."""
@@ -189,9 +215,10 @@ runner = CampaignPipelineRunner()
 
 
 # ==============================================================================
-# INTERVIEW TRACE: Entry Point (Web UI / API Request)
-# "Trace one campaign from request to output" -> Stage 0: Ingestion
-# React client sends brief JSON + optional seed -> FastAPI forwards to CampaignPipelineRunner
+# FASTAPI USAGE (End-to-End Pipeline Execution Route):
+# Primary generation endpoint. Validates brief contract, deterministically plans
+# variations, invokes AI background synthesis if needed, composites multi-format ads,
+# executes 8 blocking QA checks, and streams CampaignRunResult back to client.
 # ==============================================================================
 @app.post("/api/campaign/generate", response_model=CampaignRunResult)
 def generate_campaign_endpoint(
@@ -228,6 +255,9 @@ from fastapi.responses import FileResponse, Response
 Path("outputs").mkdir(parents=True, exist_ok=True)
 
 
+# FASTAPI USAGE (Static/Dynamic File Streaming Route):
+# Uses wildcard path parameter `{file_path:path}` to dynamically serve generated ad PNGs,
+# contact sheets, and ZIP archives via FileResponse with HTTP Cache-Control headers.
 @app.get("/api/outputs/{file_path:path}")
 def serve_output_file(file_path: str):
     """

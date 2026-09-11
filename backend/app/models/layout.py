@@ -44,7 +44,10 @@ class ShadowConfig(BaseModel):
     height_scale: float = 0.12
 
 
-# POSITION SAFETY RULE: Enforces that user-adjusted placement regions stay fully within canvas bounds
+# PYDANTIC RULE (EditableRegion):
+# 1. ConfigDict(extra="forbid"): prevents unrecognized positioning keys.
+# 2. Model validator (`within_canvas`): computes calculated bounding box based on anchor
+#    and raises ValueError if any part of the element would extend outside the canvas (0.0 to 1.0).
 class EditableRegion(NormalizedRegion):
     model_config = ConfigDict(extra="forbid")
 
@@ -61,6 +64,8 @@ class EditableRegion(NormalizedRegion):
         return self
 
 
+# PYDANTIC RULE (LayoutOverride & LayoutPreviewRequest):
+# Strict models with extra="forbid" ensuring user overrides only modify valid placement regions.
 class LayoutOverride(BaseModel):
     """Only placement regions can be overridden; canvas dimensions stay fixed."""
     model_config = ConfigDict(extra="forbid")

@@ -1,4 +1,10 @@
-"""Pydantic models and strict validation contract for YETI campaign brief."""
+# ==============================================================================
+# PYDANTIC VALIDATION CONTRACT: YETI CAMPAIGN BRIEF
+# ==============================================================================
+# This module defines the strict Pydantic schemas, field bounds, and custom validators
+# governing all campaign briefs. It ensures brand safety, deterministic execution,
+# and input integrity before any creative rendering takes place.
+# ==============================================================================
 
 from typing import List, Dict, Optional, Literal, Any
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -6,6 +12,7 @@ import re
 from backend.app.models.layout import LayoutOverride
 
 
+# PYDANTIC HELPER: Path security sanitizer blocking path traversal and absolute roots
 def validate_portable_path(path_str: str, field_name: str) -> str:
     """Ensure path is a safe relative path without leading slashes or parent traversal."""
     if not isinstance(path_str, str) or not path_str.strip():
@@ -27,6 +34,9 @@ def validate_portable_path(path_str: str, field_name: str) -> str:
     return path_str
 
 
+# PYDANTIC RULE (CampaignAgeRange):
+# 1. Field bounds: minimum and maximum must be between 20 and 120.
+# 2. Model validator (`validate_min_max`): ensures minimum does not exceed maximum.
 class CampaignAgeRange(BaseModel):
     minimum: int = Field(ge=20, le=120, description="Minimum campaign age")
     maximum: int = Field(ge=20, le=120, description="Maximum campaign age")
@@ -38,6 +48,10 @@ class CampaignAgeRange(BaseModel):
         return self
 
 
+# PYDANTIC RULE (AudienceAgeRange):
+# 1. Field bounds: target age must stay within 20 to 120.
+# 2. Model validator (`validate_age_band_integrity`): enforces that a target persona
+#    never crosses the 24/25 age boundary. Must be strictly younger (<=24) or older (>=25).
 class AudienceAgeRange(BaseModel):
     minimum: int = Field(ge=20, le=120, description="Minimum target age")
     maximum: int = Field(ge=20, le=120, description="Maximum target age")
@@ -69,6 +83,8 @@ class CampaignMeta(BaseModel):
     campaignLine: str
 
 
+# PYDANTIC RULE (RepeatProtection):
+# Uses @field_validator("priorManifestPath") to verify portable relative path security.
 class RepeatProtection(BaseModel):
     scope: str = "run-and-prior-manifest"
     avoidImmediateBackgroundRepeat: bool = True
@@ -83,6 +99,10 @@ class RepeatProtection(BaseModel):
         return validate_portable_path(str(v), "repeatProtection.priorManifestPath")
 
 
+# PYDANTIC RULE (GenerationSettings):
+# 1. Field bounds: conceptsPerAudience >= 1, exactOutputCount between 1 and 216.
+# 2. Model validator (`validate_quantities`): ensures totalOutputsPerRun matches
+#    totalAudienceGroups * adsPerAudience when exactOutputCount is not specified.
 class GenerationSettings(BaseModel):
     mode: str = "seeded-random"
     seed: Optional[int] = None
@@ -106,7 +126,8 @@ class GenerationSettings(BaseModel):
         return self
 
 
-
+# PYDANTIC RULE (ProductAsset & TaglineAsset):
+# Uses @field_validator("assetPath") to block absolute paths and directory traversal.
 class ProductAsset(BaseModel):
     colorName: str
     assetCatalogId: Optional[str] = None
@@ -132,6 +153,8 @@ class TaglineAsset(BaseModel):
         return validate_portable_path(v, "taglineAssets.assetPath")
 
 
+# PYDANTIC RULE (BackgroundPool):
+# Uses @field_validator("assets") to ensure every background path in the pool is safe and portable.
 class BackgroundPool(BaseModel):
     id: str
     activity: str
@@ -147,6 +170,10 @@ class BackgroundPool(BaseModel):
         return v
 
 
+# PYDANTIC RULE (TaglinePool):
+# 1. Field bounds: taglines list must contain at least 1 tagline (`min_length=1`).
+# 2. Model validator (`validate_tagline_color_activity_match`): Brand color constraint:
+#    beach and surfing MUST use black text (#000000); all other activities MUST use white text (#FFFFFF).
 class TaglinePool(BaseModel):
     id: str
     activity: str
@@ -168,6 +195,11 @@ class TaglinePool(BaseModel):
         return self
 
 
+# PYDANTIC RULE (Audience):
+# 1. Field bounds: `id` and `name` must be non-empty strings (`min_length=1`).
+# 2. Model validator (`validate_audience_rules`): Enforces product color targeting:
+#    - Younger band (age <= 24) MUST use orange cooler packshot.
+#    - Older band (age >= 25) MUST use white cooler packshot.
 class Audience(BaseModel):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
@@ -207,6 +239,9 @@ class OutputFormat(BaseModel):
     filenameTag: str
 
 
+# PYDANTIC RULE (Composition):
+# 1. Field validator (`check_logo`): verifies portable path on logoAssetPath.
+# 2. Model validator (`check_layers`): rejects deprecated hard-coded layer names like 'blackTagline'.
 class Composition(BaseModel):
     layersBackToFront: List[str]
     logoAssetPath: str
@@ -243,6 +278,15 @@ class Integrations(BaseModel):
     gemini: GeminiIntegration = GeminiIntegration()
 
 
+# PYDANTIC RULE (CampaignBriefModel):
+# Top-level campaign specification contract. Enforces:
+# 1. Field validator (`check_asset_catalog`): all catalog asset paths must be safe relative paths.
+# 2. Model validator (`validate_campaign_integrity`):
+#    - Rule 1: Audience IDs must be unique.
+#    - Rule 2: Output formats must use valid aspect ratios (1:1, 16:9, 9:16).
+#    - Rule 3: Output count synchronization (handles exactOutputCount and standard formula).
+#    - Rule 4: Pool IDs must be unique and referenced pools must exist.
+#    - Rule 5: Activity & territory cross-reference matching between audiences and pools.
 class CampaignBriefModel(BaseModel):
     schemaVersion: str
     layoutOverrides: Dict[Literal["1:1", "16:9", "9:16"], LayoutOverride] = Field(default_factory=dict)
