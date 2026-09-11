@@ -75,6 +75,7 @@ export interface CampaignBrief {
     adsPerAudience?: number;
     totalAudienceGroups?: number;
     totalOutputsPerRun?: number;
+    exactOutputCount?: number | null;
     selectionRules?: Record<string, string>;
     repeatProtection?: Record<string, any>;
   };

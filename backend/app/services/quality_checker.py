@@ -93,8 +93,10 @@ class QualityChecker:
         # ---------------------------------------------------------
         # BLOCKING CHECK 1: Exact Concept & Output Quantities based on Brief
         # ---------------------------------------------------------
-        expected_concepts = len(brief.audiences) * (brief.generation.conceptsPerAudience or 1)
-        expected_outputs = len(brief.audiences) * len(brief.outputFormats) * (brief.generation.conceptsPerAudience or 1)
+        from backend.app.services.output_allocation import allocate_outputs
+        allocation = allocate_outputs(brief)
+        expected_concepts = sum(len(groups) for groups in allocation.values())
+        expected_outputs = sum(len(group) for groups in allocation.values() for group in groups)
         c_count = len(concepts)
         a_count = len(ads)
         count_passed = (c_count == expected_concepts and a_count == expected_outputs)
@@ -214,7 +216,7 @@ class QualityChecker:
             elif act == "camping" and ("mountain" not in bg and "camp" not in bg and "gemini" not in bg and "mock" not in bg):
                 bg_passed = False
                 bg_violations.append(f"{concept.audience_id}: Camping activity used {concept.selected_background_path}")
-            elif act == "tailgating" and ("tailgate" not in bg and "gemini" not in bg and "mock" not in bg):
+            elif act == "tailgating" and ("tailgate" not in bg and "tailgating" not in bg and "gemini" not in bg and "mock" not in bg):
                 bg_passed = False
                 bg_violations.append(f"{concept.audience_id}: Tailgating activity used {concept.selected_background_path}")
 
@@ -270,15 +272,18 @@ class QualityChecker:
 
         for concept in concepts:
             c_ads = ads_by_concept.get(concept.concept_id, [])
-            if len(c_ads) != 3:
+            audience_concepts = [c for c in concepts if c.audience_id == concept.audience_id]
+            assigned_ids = allocation[concept.audience_id][audience_concepts.index(concept)]
+            expected_ratios = {fmt.aspectRatio for fmt in brief.outputFormats if fmt.id in assigned_ids}
+            if len(c_ads) != len(expected_ratios):
                 lock_passed = False
-                lock_violations.append(f"{concept.concept_id} has {len(c_ads)} rendered formats (expected 3)")
+                lock_violations.append(f"{concept.concept_id} has {len(c_ads)} rendered formats (expected {len(expected_ratios)})")
             ratios = {a.aspect_ratio for a in c_ads}
-            if ratios != {"1:1", "16:9", "9:16"}:
+            if ratios != expected_ratios:
                 lock_passed = False
-                lock_violations.append(f"{concept.concept_id} formats set {ratios} != {'1:1', '16:9', '9:16'}")
+                lock_violations.append(f"{concept.concept_id} formats set {ratios} != {expected_ratios}")
 
-        lock_msg = "All 6 audience concepts lock background, product, and tagline across all 3 formats (1:1, 16:9, 9:16)." if lock_passed else f"Concept locking failures: {', '.join(lock_violations)}"
+        lock_msg = "All concepts have exactly their assigned formats with shared concept assets." if lock_passed else f"Concept locking failures: {', '.join(lock_violations)}"
         if not lock_passed:
             errors.append(lock_msg)
         checks.append(CheckResult(

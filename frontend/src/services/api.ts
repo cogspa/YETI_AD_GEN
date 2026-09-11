@@ -26,6 +26,35 @@ export interface AssetReadinessReport {
 
 export const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL ? String(import.meta.env.VITE_API_URL).replace(/\/$/, '') : '');
 
+export interface BriefConversionResult {
+  brief: CampaignBrief;
+  assumptions: string[];
+  warnings: string[];
+  summary: { audienceCount: number; formatCount: number; totalOutputs: number };
+  formatCounts?: Record<string, number>;
+}
+
+export async function convertBrief(text: string, signal?: AbortSignal): Promise<BriefConversionResult> {
+  const res = await fetch(`${API_BASE}/api/brief/convert`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+    signal,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const detail = data?.detail;
+    const message = typeof detail === 'string' ? detail : detail?.message;
+    const errors: string[] = Array.isArray(detail?.errors) ? detail.errors :
+      Array.isArray(detail) ? detail.map((item: { msg?: string }) => item.msg || 'Invalid brief text.') : [];
+    throw new Error([message || `Brief conversion failed (${res.status}).`, ...errors].join('\n'));
+  }
+  if (!data?.brief || !data?.summary || !Array.isArray(data.assumptions) || !Array.isArray(data.warnings)) {
+    throw new Error('The server returned an invalid draft. Please try again.');
+  }
+  return data;
+}
+
 export function resolveMediaUrl(url?: string | null): string {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
@@ -185,4 +214,3 @@ export async function generateCampaignAds(
 
   return await res.json();
 }
-

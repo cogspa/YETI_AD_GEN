@@ -20,24 +20,13 @@ NEGATIVE_PROMPT_DEFAULT = (
 )
 
 ACTIVITY_PROMPT_TEMPLATES = {
-    "beach": (
-        "Commercial cinematic photography of the Westside Los Angeles Pacific coastline in Santa Monica and Malibu. "
-        "Bright sunny daylight, clear Pacific Ocean horizon, gentle waves meeting clean warm golden sand. "
-        "Wide scenic landscape with open sky and vast clean negative space across the middle ground and foreground. "
-        "Clean, pristine, uncluttered commercial environment. No coolers, no products, no logos, no text."
-    ),
-    "camping": (
-        "Commercial cinematic photography of the Los Angeles mountain wilderness in the San Gabriel Mountains and Angeles National Forest. "
-        "Majestic tall pine trees, mountain ridgelines in soft golden haze, and rugged natural dirt trail foreground. "
-        "Clean darker foreground earth providing high-contrast negative space for product packshots. "
-        "Atmospheric, serene, high-end outdoor landscape. No tents, no coolers, no products, no logos, no text."
-    ),
-    "tailgating": (
-        "Commercial cinematic photography of an open-air Los Angeles autumn outdoor gathering space in Westwood or South Central. "
-        "Warm late-afternoon golden-hour sunlight casting long soft shadows across clean open asphalt and park perimeter grass, "
-        "with distant soft-focus stadium architecture in the far background. Uncluttered, expansive central foreground. "
-        "No team marks, no college logos, no UCLA or USC mascots, no uniforms, no text, no coolers."
-    ),
+    "beach": "A locally appropriate coastal beach with sand, shoreline, and light foreground space.",
+    "camping": "A locally appropriate campsite landscape with natural terrain and darker foreground space.",
+    "tailgating": "A locally appropriate game-day gathering area with uncluttered asphalt or park foreground.",
+    "hiking": "A locally appropriate walking trail and open landscape with clear foreground space.",
+    "surfing": "A locally appropriate surf coastline with waves, shoreline, and light foreground space.",
+    "fishing": "A locally appropriate fishing setting beside water with clear foreground space.",
+    "climbing": "A locally appropriate climbing landscape with rock formations and clear foreground space.",
 }
 
 
@@ -152,21 +141,19 @@ class GeminiBackgroundGenerator:
     ) -> Tuple[str, str]:
         """Construct a strict guardrailed prompt and negative prompt for any activity or territory."""
         act_key = activity.lower().strip()
-        if act_key in ACTIVITY_PROMPT_TEMPLATES:
-            base_prompt = ACTIVITY_PROMPT_TEMPLATES[act_key]
-        else:
-            loc_str = territory if territory else "scenic California outdoors"
-            base_prompt = (
-                f"Commercial cinematic photography of an open-air {activity} outdoor environment in {loc_str}. "
-                "Natural daylight, wide atmospheric landscape, beautiful scenery, and vast clean negative space "
-                "across the central foreground for commercial product packshot composite integration. "
-                "Clean, pristine, uncluttered high-end commercial environment. No coolers, no products, no logos, no text, no people."
-            )
-
-        if territory and territory not in base_prompt:
-            base_prompt = f"{base_prompt} Location context: {territory}."
+        location = territory.strip() if territory and territory.strip() else "Los Angeles"
+        scene = ACTIVITY_PROMPT_TEMPLATES.get(
+            act_key, f"A locally appropriate {activity} outdoor setting with clear foreground space."
+        )
+        base_prompt = (
+            f"Commercial cinematic photography of a {activity} environment in {location}. "
+            f"{scene} Match the terrain, vegetation, architecture, and atmosphere to this location. "
+            "Do not substitute scenery from another territory. "
+            "Natural daylight and wide composition with clean negative space for a foreground product packshot. "
+            "No coolers, no products, no logos, no text, no people, no team marks or mascots."
+        )
         if custom_suffix:
-            base_prompt = f"{base_prompt} {custom_suffix.strip()}"
+            base_prompt += f" Campaign scene direction: {custom_suffix.strip()}"
 
         return base_prompt, NEGATIVE_PROMPT_DEFAULT
 

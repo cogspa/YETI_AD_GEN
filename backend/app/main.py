@@ -11,6 +11,8 @@ from typing import Dict, Any, Optional
 from backend.app.models.brief import CampaignBriefModel
 from backend.app.models.assets import AssetReadinessReport
 from backend.app.services.brief_validator import validate_brief_dict
+from backend.app.models.brief_conversion import BriefConversionRequest
+from backend.app.services.brief_converter import BriefConversionError, convert_natural_language_brief
 from backend.app.services.asset_resolver import AssetResolver
 
 
@@ -82,6 +84,15 @@ def get_integrations_status():
 
 
 
+@app.post("/api/brief/convert")
+async def convert_brief_endpoint(request: BriefConversionRequest):
+    """Convert plain language to a validated draft, without rendering or uploading ads."""
+    try:
+        return await convert_natural_language_brief(request.text)
+    except BriefConversionError as exc:
+        raise HTTPException(status_code=exc.status_code, detail={"message": str(exc), "errors": exc.errors}) from exc
+
+
 @app.post("/api/brief/validate")
 def validate_brief_endpoint(brief: Dict[str, Any] = Body(...)):
     """Validates campaign brief against strict contract."""
@@ -149,12 +160,30 @@ from backend.app.services.pipeline_runner import CampaignPipelineRunner
 runner = CampaignPipelineRunner()
 
 
+# ==============================================================================
+# INTERVIEW TRACE: Entry Point (Web UI / API Request)
+# "Trace one campaign from request to output" -> Stage 0: Ingestion
+# React client sends brief JSON + optional seed -> FastAPI forwards to CampaignPipelineRunner
+# ==============================================================================
 @app.post("/api/campaign/generate", response_model=CampaignRunResult)
 def generate_campaign_endpoint(
     brief: Dict[str, Any] = Body(...),
     seed: Optional[int] = None,
 ):
-    """Executes end-to-end 18-ad campaign generation pipeline."""
+    """
+    Executes end-to-end multi-format campaign generation pipeline.
+    
+    Trace lifecycle:
+      1. Validates brief contract with Pydantic
+      2. Resolves & hashes controlled brand assets
+      3. Checks repeat history (prior manifest)
+      4. Deterministically plans concepts using seed
+      5. Generates missing backgrounds via Gemini AI (or procedural fallback)
+      6. Composites 3 aspect ratios per concept via Pillow (fit_within_region)
+      7. Builds contact sheet & ZIP bundle
+      8. Runs 8 blocking quality checks
+      9. Syncs outputs & manifest to storage
+    """
     try:
         run_result = runner.execute_campaign(brief_dict=brief, seed=seed)
         return run_result
@@ -217,4 +246,3 @@ def serve_output_file(file_path: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
-

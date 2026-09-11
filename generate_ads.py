@@ -82,6 +82,11 @@ Examples:
         bar = "█" * filled + "░" * (bar_len - filled)
         print(f"\033[90m{pct}\033[0m \033[96m{bar}\033[0m \033[1m{event.stage:<32}\033[0m {event.message}")
 
+    # ==============================================================================
+    # INTERVIEW TRACE: CLI Entry Point
+    # "Trace one campaign from request to output" -> Stage 0: CLI Ingestion
+    # Invokes CampaignPipelineRunner with brief JSON and seed, streaming terminal events
+    # ==============================================================================
     runner = CampaignPipelineRunner(local_base_dir=args.output_dir)
     print("\033[94m[*] Executing Campaign Pipeline...\033[0m")
 

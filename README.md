@@ -2,9 +2,11 @@
 
 A deterministic creative advertising adaptation engine for YETI's **"Go Anywhere with YETI"** Los Angeles campaign. Built with **FastAPI**, **Pillow (PIL)**, **React 19**, **TypeScript**, and **Vanilla CSS**.
 
-The ad count is dictated entirely by the brief: $\text{audiences} \times \text{concepts per audience} \times 3 \text{ aspect ratios}$ (`1:1` Square, `16:9` Landscape, `9:16` Vertical). The bundled sample briefs produce 18, 36, and 72 ads, but the engine is not bound to those sizes. Every run is deterministic — the same brief and seed reproduce byte-identical output — with locked per-concept assets, consistent typography hierarchy, and automated quality checks.
+Supports both structured JSON briefs and **natural-language campaign briefs with automated brief-to-JSON conversion** (powered by OpenAI or Google Gemini), converting conversational campaign concepts directly into validated, production-ready creative briefs.
 
-> **Short pitch:** “Go Anywhere with YETI” is a modular campaign and creative-automation prototype that converts a structured brief and approved brand assets into a quality-controlled family of product, audience, regional, and social-media ad variations.
+The ad count is dictated entirely by the brief: $\text{audiences} \times \text{concepts per audience} \times 3 \text{ aspect ratios}$ (`1:1` Square, `16:9` Landscape, `9:16` Vertical), or by explicit output allocation targets. The bundled sample briefs produce 18, 36, and 72 ads, but the engine is not bound to those sizes. Every run is deterministic — the same brief and seed reproduce byte-identical output — with locked per-concept assets, consistent typography hierarchy, and automated quality checks.
+
+> **Short pitch:** “Go Anywhere with YETI” is a modular creative-automation platform that translates natural-language or structured briefs and approved brand assets into a quality-controlled family of product, audience, regional, and social-media ad variations.
 
 ### 🎬 Campaign Demo Video
 
@@ -18,7 +20,7 @@ The ad count is dictated entirely by the brief: $\text{audiences} \times \text{c
 
 **"Go Anywhere with YETI"** is a Los Angeles–focused advertising campaign promoting two YETI cooler products across multiple audiences, locations, product colors, and digital ad formats. It targets young adults, college students, campers, and tailgaters, presenting YETI coolers as durable products that move easily between outdoor recreation and social experiences.
 
-A user submits a structured campaign brief (JSON, spreadsheet, or the web UI) containing products, available colors, audience segments, regional information, approved campaign copy, brand standards, and links to source assets. The system retrieves approved product photography, logos, fonts, colors, lifestyle backgrounds, and messaging from organized storage. If a required lifestyle or hero image is unavailable, the pipeline requests one from a generative-image API using the campaign's art direction and brand constraints, then stores it alongside the campaign assets for review and reuse.
+A user can either describe a campaign in natural, conversational language (e.g. *"Create 18 YETI ads for Los Angeles targeting college students and mountain campers..."*) or submit a structured JSON brief. The built-in AI brief converter translates natural language into a fully validated JSON campaign contract with demographic targeting, colorway rules, and output allocations. The system then retrieves approved product photography, logos, fonts, colors, lifestyle backgrounds, and messaging from organized storage. If a required lifestyle or hero image is unavailable, the pipeline requests one from a generative-image API using the campaign's art direction and brand constraints, then stores it alongside the campaign assets for review and reuse.
 
 The pipeline builds a variation matrix combining two cooler products, multiple approved product colors, camping/tailgating/beach and other LA environments, audience and demographic variations, Los Angeles–specific messaging, and square/vertical/landscape formats. For each variation it selects the template, places product and background imagery, applies the correct product color, inserts the campaign message, and adds brand elements.
 
@@ -32,7 +34,7 @@ The project demonstrates how a repeatable creative-production system turns one a
 
 | Assessment requirement | Implementation | Result |
 | :--- | :--- | :---: |
-| **Structured campaign brief** | JSON brief with market, audiences, campaign message, rules, and assets | **Exceeded** |
+| **Structured & natural-language campaign brief** | Direct JSON brief ingestion + AI-powered natural-language brief-to-JSON conversion (OpenAI / Gemini) with strict schema validation | **Exceeded** |
 | **At least two products** | Orange and White cooler SKUs (Roadie 24 & Tundra 45) with distinct colorway packshots and model metadata | **Satisfied** |
 | **Reuse existing assets** | Local/Dropbox asset resolver with caching and SHA-256 integrity checks | **Exceeded** |
 | **Generate missing assets with GenAI** | Google Gemini background-generation fallback | **Satisfied** |
@@ -91,24 +93,27 @@ Open **`http://localhost:5173`** in your browser.
 5. [18-Ad Baseline vs. 72-Ad Gemini Multi-Demographic Campaign](#5-18-ad-baseline-vs-72-ad-gemini-multi-demographic-campaign)
 6. [Campaign Rules Matrix & Demographic Expansion](#6-campaign-rules-matrix--demographic-expansion)
 7. [Asset Tree & Asset Resolver](#7-asset-tree--asset-resolver)
-8. [JSON Brief Validation Rules](#8-json-brief-validation-rules)
-9. [Current & Previous-Run Repeat Protection](#9-current--previous-run-repeat-protection)
-10. [Same-Concept Ratio Adaptation](#10-same-concept-ratio-adaptation)
-11. [Dropbox Cloud Storage & Configuration](#11-dropbox-cloud-storage--configuration)
-12. [Google Gemini AI Scene Generation & Fallback Architecture](#12-google-gemini-ai-scene-generation--fallback-architecture)
-13. [Controlled Assets & Human Review Governance](#13-controlled-assets--human-review-governance)
-14. [Prerequisites & Fresh-Clone Setup](#14-prerequisites--fresh-clone-setup)
-15. [Secret-Free Environment Configuration](#15-secret-free-environment-configuration)
-16. [Running the Baseline 18-Ad Campaign](#16-running-the-baseline-18-ad-campaign)
-17. [Running the Expanded 72-Ad Gemini AI Campaign](#17-running-the-expanded-72-ad-gemini-ai-campaign)
-18. [Automated Test Suite (51 Backend / 3 Frontend)](#18-automated-test-suite-51-backend--3-frontend)
-19. [Output Directory Structure & Hierarchy Overview](#19-output-directory-structure--hierarchy-overview)
-20. [Architectural Decisions & Tradeoffs](#20-architectural-decisions--tradeoffs)
-21. [System Assumptions & Honest Limitations](#21-system-assumptions--honest-limitations)
-22. [Production Evolution Roadmap](#22-production-evolution-roadmap)
-23. [Under-Three-Minute Evaluator Demo Path](#23-under-three-minute-evaluator-demo-path)
-24. [Addendum: Possible Features to Add](#24-addendum-possible-features-to-add)
-25. [Addendum: Enterprise Compatibility & Multi-Brand Generalization](#25-addendum-enterprise-compatibility--multi-brand-generalization)
+8. [Natural-Language Campaign Briefs & Brief-to-JSON Conversion](#8-natural-language-campaign-briefs--brief-to-json-conversion)
+9. [JSON Brief Validation Rules](#9-json-brief-validation-rules)
+10. [Current & Previous-Run Repeat Protection](#10-current--previous-run-repeat-protection)
+11. [Same-Concept Ratio Adaptation](#11-same-concept-ratio-adaptation)
+12. [Dropbox Cloud Storage & Configuration](#12-dropbox-cloud-storage--configuration)
+13. [Google Gemini AI Scene Generation & Fallback Architecture](#13-google-gemini-ai-scene-generation--fallback-architecture)
+14. [Controlled Assets & Human Review Governance](#14-controlled-assets--human-review-governance)
+15. [Prerequisites & Fresh-Clone Setup](#15-prerequisites--fresh-clone-setup)
+16. [Secret-Free Environment Configuration](#16-secret-free-environment-configuration)
+17. [Running the Baseline 18-Ad Campaign](#17-running-the-baseline-18-ad-campaign)
+18. [Running the Expanded 72-Ad Gemini AI Campaign](#18-running-the-expanded-72-ad-gemini-ai-campaign)
+19. [Automated Test Suite (107 Tests)](#19-automated-test-suite-107-tests)
+20. [Output Directory Structure & Hierarchy Overview](#20-output-directory-structure--hierarchy-overview)
+21. [Architectural Decisions & Tradeoffs](#21-architectural-decisions--tradeoffs)
+22. [System Assumptions & Honest Limitations](#22-system-assumptions--honest-limitations)
+23. [Production Evolution Roadmap](#23-production-evolution-roadmap)
+24. [Under-Three-Minute Evaluator Demo Path](#24-under-three-minute-evaluator-demo-path)
+25. [Addendum: Possible Features to Add](#25-addendum-possible-features-to-add)
+26. [Addendum: Enterprise Compatibility & Multi-Brand Generalization](#26-addendum-enterprise-compatibility--multi-brand-generalization)
+27. [Netlify & Firebase Integration Guide](#27-netlify--firebase-integration-guide)
+28. [Live Cloud Architecture & Feature Updates (v2.1)](#28-live-cloud-architecture--feature-updates-v21)
 
 ---
 
@@ -118,10 +123,10 @@ Enterprise campaigns require dozens of creative variations tailored to distinct 
 
 The YETI Ad Generator automates this workflow deterministically:
 
-- **Ingests structured JSON campaign briefs** describing target audiences, regional activities, and creative constraints.
+- **Ingests natural-language and structured JSON briefs** — supports conversational plain-English campaign briefs with automatic brief-to-JSON conversion (OpenAI or Gemini) as well as direct JSON uploads.
 - **Resolves and verifies canonical brand assets** (logos, products, approved background scenes, vector taglines).
 - **Applies seeded randomization** to select scenes and taglines while enforcing demographic targeting rules.
-- **Brief-driven scale**: output count is $\text{audiences} \times \text{concepts} \times 3 \text{ ratios}$, whatever the brief specifies. Validated first on an 18-ad sample brief ($6 \times 1 \times 3$), then on a 72-ad brief ($12 \times 2 \times 3$) that exercises automated AI scene generation with Google Gemini for demographics with no approved photography.
+- **Brief-driven scale**: output count is $\text{audiences} \times \text{concepts} \times 3 \text{ ratios}$ (or custom output count allocations), whatever the brief specifies. Validated on an 18-ad sample brief ($6 \times 1 \times 3$), a 36-ad brief ($6 \times 2 \times 3$), and a 72-ad brief ($12 \times 2 \times 3$) that exercises automated AI scene generation with Google Gemini for demographics with no approved photography.
 - **Renders composite ads** across `1:1`, `16:9`, and `9:16` with ratio-specific layout adjustments.
 - **Runs 8 blocking quality checks**, builds a master contact sheet, generates compliance reports, and uploads artifacts to cloud storage.
 
@@ -136,6 +141,7 @@ A full interactive web application for creative directors, campaign managers, an
 - **Backend**: Python FastAPI (ASGI) with Pillow for composite rendering and the Google GenAI SDK for scene synthesis.
 
 ### Features
+- **Natural-Language Brief Intake & Brief-to-JSON Conversion** — describe audience groups, age ranges, territories, output counts, and creative directions in plain English (or pick a pre-built example) and convert them with one click into a validated, schema-compliant JSON brief with clear assumptions, warnings, and visual summary.
 - **Brief Editor & Schema Validator** — ingests, inspects, and validates brief JSON in the browser with real-time error feedback and syntax highlighting.
 - **Dynamic Audience & Matrix Formula** — computes planned output counts from loaded personas ($N \text{ audiences} \times M \text{ concepts} \times 3 \text{ formats} = \text{target ads}$), with age-group distribution and collapsible sections.
 - **Asset Readiness & Integrity Monitor** — verifies canonical brand assets on disk and in cloud storage (presence, format, transparency, non-zero size, SHA-256 hash) and shows readiness badges.
@@ -190,7 +196,9 @@ The compositor uses defined layout configurations per aspect ratio to preserve p
 
 ```mermaid
 graph TD
-    A[Campaign Brief JSON] --> B[Brief Validation Engine]
+    NL[Natural-Language Campaign Brief] -->|OpenAI Responses / Gemini Structured Output| B0[Brief Compiler & Sanitizer]
+    B0 --> A[Validated Campaign Brief JSON]
+    A --> B[Brief Validation Engine]
     B -->|Schema / Rule Error| C[Reject with Line Diagnostics]
     B -->|Valid Brief| D[Asset Resolver]
     
@@ -288,21 +296,107 @@ assets/
 
 ---
 
-## 8. JSON Brief Validation Rules
+## 8. Natural-Language Campaign Briefs & Brief-to-JSON Conversion
 
-Enforced in both backend (`backend/app/services/brief_validator.py`) and frontend (`frontend/src/utils/validation.ts`):
+The campaign brief panel accepts a plain-language description as well as JSON uploads.
+Choose **Use example** or describe the audience groups, ages, locations,
+ad count, and output formats, then select **Convert to JSON**. Review the generated
+JSON, defaults, and notes, and select **Use this brief** to load it into the existing
+editor and campaign summary. **Generate Ads** remains a separate action.
+
+For example:
+
+> Create 18 YETI ads for Los Angeles. Target college tailgaters in Westwood ages
+> 20–24, Westside beachgoers ages 25–30, and mountain campers ages 25–30. Use two
+> concepts per audience in square, landscape, and vertical formats. Keep the
+> approved Go Anywhere artwork and cooler color rules.
+
+Choose a conversion provider in the backend environment, then restart the backend:
+
+| Provider | Setting | API key | Default text model |
+| --- | --- | --- | --- |
+| OpenAI | `BRIEF_CONVERSION_PROVIDER=openai` (default) | `OPENAI_API_KEY` | `OPENAI_BRIEF_MODEL=gpt-6-astra` |
+| Gemini | `BRIEF_CONVERSION_PROVIDER=gemini` | `GEMINI_API_KEY` | `GEMINI_BRIEF_MODEL=gemini-3.8-flash` |
+
+Gemini can reuse the existing background provider's API key, but brief conversion
+uses its own text model setting. Never put either key in a `VITE_` variable or
+frontend source. JSON uploads work without either key. Provider selection is
+explicit; errors never silently send a brief to a different provider.
+The converter uses the existing `httpx` dependency; no additional SDK is required.
+
+`POST /api/brief/convert` accepts `{"text": "your campaign description"}` and returns
+`brief`, `assumptions`, `warnings`, and `summary` (audienceCount, formatCount,
+totalOutputs). Errors use `detail.message` and `detail.errors`. The endpoint uses
+OpenAI Responses with [strict Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
+or Gemini Generate Content with [JSON-schema structured output](https://ai.google.dev/gemini-api/docs/generate-content/structured-output).
+Both providers extract the same bounded intent schema, then the backend builds a complete `CampaignBriefModel` from approved local templates and
+passes it through the existing backend validator. The provider extracts campaign
+intent; it does not choose filesystem paths, write files, render ads, or upload assets.
+For Gemini, the provider schema inlines references and omits numeric/length bounds
+that its schema converter rejects alongside nullable values. All bounds remain
+enforced locally by `BriefIntent` before the campaign compiler can return a draft.
+
+Territories are unrestricted. The eight original activity/location pools are reusable
+assets, not a geographic allowlist. If a requested location/activity does not match
+an approved pool, conversion creates a new pool with `assets: []`, a unique ID,
+and location-specific `visualDirection`. The pipeline sends both the territory and
+that direction to Gemini when generating ads. It never reuses an unrelated LA photo
+for a new territory; image-generation failures stop the run instead of presenting
+a procedural placeholder as that location.
+
+Audience ages now support 20–120. Ages 20–24 use orange coolers; ages 25+ use white.
+For “over 40,” extraction uses 41–120, with 120 disclosed as the schema ceiling for
+an open-ended range. Ranges crossing 25 are split into separate audiences.
+The supported activities are beach, camping, tailgating, hiking, surfing, fishing,
+and climbing. If an activity is omitted, conversion chooses a locally plausible
+activity and lists that assumption for review. Approved GO ANYWHERE artwork and
+the three standard format sizes still apply. Custom visible taglines require
+a separate renderer change because the current pipeline composites approved image
+overlays. Hiking, surfing, fishing, and climbing scenes use the existing background
+generation flow when ads are generated, as do new territories for any supported activity.
+
+Example: `create 12 ad fors Inland Empire, for over 40` creates a regional brief
+with an older audience, white cooler, generated background pool, and 12 outputs.
+The draft lists any inferred activity, product model, and age range.
+
+Conversion supports up to 12,000 input characters, 24 audience groups after age
+splitting, 10 concepts per audience, and 216 ads. Explicit totals use
+`generation.exactOutputCount`: the allocator distributes the requested count across
+audiences and formats, permitting partial final concepts. For example, 20 ads for
+one audience and all three formats produces 7 square, 7 landscape, and 6 vertical
+outputs. The total must provide at least one output per selected audience.
+`conceptsPerAudience` reports the maximum needed for an audience; `adsPerAudience`
+is null when the audience allocations differ. Without an exact count, the original
+audiences × concepts × formats behavior remains. The draft reports `formatCounts`,
+and generation, quality checks, and contact sheets use the actual assignment.
+Every conversion gets a separate campaign
+ID and output/manifest location. Conversion calls time out after 90 seconds and
+return a clear error for missing credentials, provider failures, or incomplete output.
+
+Tests (mocked provider; no API spend):
+
+```sh
+.venv/bin/python -m pytest backend/tests/test_brief_conversion.py backend/tests/test_brief_validation.py -q
+cd frontend
+npm exec vitest run
+npm run build
+```
+
+## 9. JSON Brief Validation Rules
+
+The backend (`backend/app/services/brief_validator.py`) enforces the campaign contract. The frontend (`frontend/src/utils/validation.ts`) provides basic structure checks:
 
 - **Audience count**: at least one audience; the engine derives output count from the brief ($\text{audiences} \times \text{concepts} \times \text{formats}$). The sample briefs use 6 and 12.
-- **Format count**: exactly 3 formats (`1:1`, `16:9`, `9:16`).
-- **Age range integrity**: ranges cannot span the 24/25 boundary (e.g. 20–30 is rejected).
+- **Formats**: select from `1:1`, `16:9`, and `9:16`.
+- **Age range integrity**: ages 20–120; individual audiences cannot span the 24/25 color boundary. Natural-language conversion splits such ranges into two audiences.
 - **Product color targeting**: younger audiences must target `product_orange.png`; older audiences must target `product_white.png`.
-- **Activity → background pool**: Beach → `beach-west-coast`; Camping → `camping-la-mountains`; Tailgating → `tailgating-college-*`. Activities with no approved pool (Hiking, Surfing, Fishing, Climbing) route to Gemini scene generation.
+- **Activity → background pool**: each audience must reference a pool with a matching activity and territory. New territories use generated pools with no assets and route to Gemini scene generation.
 - **Tagline color**: Beach audiences use Black `#000000`; Camping/Tailgating use White `#FFFFFF`.
 - **Security**: no absolute system paths or `../` sequences in asset URIs.
 
 ---
 
-## 9. Current & Previous-Run Repeat Protection
+## 10. Current & Previous-Run Repeat Protection
 
 To avoid creative fatigue across multi-audience campaigns, the `ConceptPlanner` applies:
 
@@ -312,7 +406,7 @@ To avoid creative fatigue across multi-audience campaigns, the `ConceptPlanner` 
 
 ---
 
-## 10. Same-Concept Ratio Adaptation
+## 11. Same-Concept Ratio Adaptation
 
 Once an audience concept is selected, the asset bundle is locked:
 
@@ -329,7 +423,7 @@ The compositor applies ratio-specific coordinate grids and scaling without alter
 
 ---
 
-## 11. Dropbox Cloud Storage & Configuration
+## 12. Dropbox Cloud Storage & Configuration
 
 - **Dropbox storage adapter**: `backend/app/services/dropbox_adapter.py`.
 - **Scope**: Dropbox App Folder (`/Apps/<YourApp>/yeti-ad-generator/campaigns/`).
@@ -339,7 +433,7 @@ The compositor applies ratio-specific coordinate grids and scaling without alter
 
 ---
 
-## 12. Google Gemini AI Scene Generation & Fallback Architecture
+## 13. Google Gemini AI Scene Generation & Fallback Architecture
 
 - **Integration**: `backend/app/services/gemini_generator.py`.
 - **Dynamic demographic scene generation** — when a brief introduces lifestyles or territories without static assets (Hiking, Surfing, Fishing, Climbing), the engine calls the Gemini image model (`gemini-2.5-flash-image` / `imagen-3.0`) to synthesize commercial lifestyle backgrounds (1408×768 to 2048×2048).
@@ -350,7 +444,7 @@ The compositor applies ratio-specific coordinate grids and scaling without alter
 
 ---
 
-## 13. Controlled Assets & Human Review Governance
+## 14. Controlled Assets & Human Review Governance
 
 - **Zero packshot distortion** — product packshots and logos keep intact aspect ratios via bicubic resampling.
 - **Human review badge** — any adaptation using an AI-generated background is tagged `human_review_required: true` and shown with an orange warning badge in both the JSON report and the UI.
@@ -358,7 +452,7 @@ The compositor applies ratio-specific coordinate grids and scaling without alter
 
 ---
 
-## 14. Prerequisites & Fresh-Clone Setup
+## 15. Prerequisites & Fresh-Clone Setup
 
 **Prerequisites**: Python 3.12+, Node.js 18+, npm 9+.
 
@@ -395,7 +489,7 @@ Open **`http://localhost:5173`**.
 
 ---
 
-## 15. Secret-Free Environment Configuration
+## 16. Secret-Free Environment Configuration
 
 `.env.example` contains variable names with safe placeholders only:
 
@@ -426,7 +520,7 @@ No live API keys, Dropbox tokens, or credentials are required to run the full pi
 
 ---
 
-## 16. Running the Baseline 18-Ad Campaign
+## 17. Running the Baseline 18-Ad Campaign
 
 ### CLI
 ```bash
@@ -442,7 +536,7 @@ python generate_ads.py --brief yeti_la_random_ad_campaign.json --seed 42
 
 ---
 
-## 17. Running the Expanded 72-Ad Gemini AI Campaign
+## 18. Running the Expanded 72-Ad Gemini AI Campaign
 
 ### CLI
 ```bash
@@ -458,14 +552,14 @@ python generate_ads.py --brief yeti_la_random_ad_campaign_72.json --seed 42
 
 ---
 
-## 18. Automated Test Suite (51 Backend / 3 Frontend)
+## 19. Automated Test Suite (107 Tests)
 
 ```bash
-# 1. Backend pytest (51 tests)
+# 1. Backend pytest (99 passing tests across conversion, validation, compositor, QA)
 PYTHONPATH=. .venv/bin/pytest backend/tests/ -v
 
-# 2. Frontend Vitest unit tests
-npx --prefix frontend vitest run --dir frontend
+# 2. Frontend Vitest unit tests (8 tests across NaturalLanguageBrief and App)
+npm --prefix frontend exec vitest run
 
 # 3. Frontend typecheck & production build
 npm run --prefix frontend build
@@ -476,7 +570,7 @@ npx --prefix frontend oxlint
 
 ---
 
-## 19. Output Directory Structure & Hierarchy Overview
+## 20. Output Directory Structure & Hierarchy Overview
 
 The output hierarchy has been updated to organize outputs **by product and aspect ratio** across all layers of the system.
 
@@ -523,7 +617,7 @@ outputs/
 
 ---
 
-## 20. Architectural Decisions & Tradeoffs
+## 21. Architectural Decisions & Tradeoffs
 
 | Decision | Choice Made | Alternative Considered | Rationale |
 | :--- | :--- | :--- | :--- |
@@ -535,7 +629,7 @@ outputs/
 
 ---
 
-## 21. System Assumptions & Honest Limitations
+## 22. System Assumptions & Honest Limitations
 
 - **No automated trademark detection** — background safety relies on restricting scenes to approved, pre-cleared asset pools, not computer-vision classification.
 - **Bounded AI scene generation** — Gemini only generates backgrounds. It never generates packshots, logos, or typography.
@@ -546,7 +640,7 @@ outputs/
 
 ---
 
-## 22. Production Evolution Roadmap
+## 23. Production Evolution Roadmap
 
 - **Durable job queue** — move synchronous runs to Celery or Temporal with Redis/RabbitMQ for parallel batch execution.
 - **Enterprise DAM integration** — connect to Adobe Experience Manager or Bynder via webhooks to ingest newly approved assets.
@@ -557,7 +651,7 @@ outputs/
 
 ---
 
-## 23. Under-Three-Minute Evaluator Demo Path
+## 24. Under-Three-Minute Evaluator Demo Path
 
 1. **Clone & Setup Environment**:
    ```bash
@@ -604,7 +698,7 @@ outputs/
 
 ---
 
-## 24. Addendum: Possible Features to Add
+## 25. Addendum: Possible Features to Add
 
 The modular design of this creative engine makes it straightforward to extend with high-leverage advertising features:
 
@@ -636,7 +730,7 @@ The modular design of this creative engine makes it straightforward to extend wi
 
 ---
 
-## 25. Addendum: Enterprise Compatibility & Multi-Brand Generalization
+## 26. Addendum: Enterprise Compatibility & Multi-Brand Generalization
 
 The architecture of this application is **completely brand-agnostic**. The core pipeline (brief ingestion, asset resolution, coordinate math, quality checks, and storage synchronization) can be cloned and generalized for any enterprise brand (e.g., Nike, Patagonia, Apple, Target, Ford):
 
@@ -697,7 +791,7 @@ Abstract the compositor's coordinate grids into reusable layout presets:
 
 ---
 
-## 26. Netlify & Firebase Integration Guide
+## 27. Netlify & Firebase Integration Guide
 
 The system supports continuous frontend deployment on **Netlify** alongside cloud persistence with **Firebase**:
 
@@ -725,7 +819,7 @@ To store generated campaign runs in Firebase Cloud Storage:
 
 ---
 
-## 27. Live Cloud Architecture & Feature Updates (v2.1)
+## 28. Live Cloud Architecture & Feature Updates (v2.1)
 
 ### 1. Multi-Tier Full-Stack Deployment
 - **Frontend Dashboard (Netlify)**: [https://yeti-ad-generator.netlify.app](https://yeti-ad-generator.netlify.app)
@@ -744,5 +838,3 @@ To store generated campaign runs in Firebase Cloud Storage:
 - **Backend Tests**: 53/53 Unit & Integration Tests Passing (100%).
 - **Frontend Build & Tests**: Vite production build (0 warnings) and 3/3 Vitest tests passing.
 - **Local CLI**: `python generate_ads.py --brief yeti_la_random_ad_campaign.json --seed 42` renders 18 ads in 22s completely offline.
-
-

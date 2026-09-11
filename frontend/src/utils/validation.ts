@@ -59,7 +59,7 @@ export function validateBrief(data: any): BriefValidationResult {
   }
 
   const conceptsPerAudience = Number(data.generation?.conceptsPerAudience) || 1;
-  const totalOutputs = Number(data.generation?.totalOutputsPerRun) || (audienceCount * formatCount * conceptsPerAudience);
+  const totalOutputs = Number(data.generation?.exactOutputCount) || Number(data.generation?.totalOutputsPerRun) || (audienceCount * formatCount * conceptsPerAudience);
 
   return {
     isValid: errors.length === 0,
@@ -70,4 +70,3 @@ export function validateBrief(data: any): BriefValidationResult {
     totalOutputs,
   };
 }
-

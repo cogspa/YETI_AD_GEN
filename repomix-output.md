@@ -28,7 +28,7 @@ The content is organized as follows:
 ## Notes
 - Some files may have been excluded based on .gitignore rules and Repomix's configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
-- Files matching these patterns are excluded: assets/**, outputs/**, ad_examples/**, *.psd, *.png, *.jpg, *.jpeg, *.webp, *.zip, repomix-output.*, .env
+- Files matching these patterns are excluded: repomix-output.*, *.psd, assets/**, outputs/**, package-lock.json, frontend/package-lock.json
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
 - Files are sorted by Git change count (files with more changes are at the bottom)
@@ -143,6 +143,158 @@ yeti_la_random_ad_campaign.json
 ```
 
 # Files
+
+## File: backend/app/models/assets.py
+````python
+"""Pydantic models for Asset Catalog and Path Resolution."""
+
+from typing import Optional, Tuple, Literal, List, Dict
+from pydantic import BaseModel, Field
+
+
+AssetRole = Literal[
+    "product_orange",
+    "product_white",
+    "background_beach",
+    "background_camping",
+    "background_tailgating",
+    "tagline_black",
+    "tagline_white",
+    "brand_logo",
+    "font_regular",
+    "font_bold",
+    "layout_reference_1x1",
+    "layout_reference_16x9",
+    "layout_reference_9x16",
+]
+
+AssetStatus = Literal[
+    "local",
+    "cached_from_dropbox",
+    "dropbox_available",
+    "missing_gemini_eligible",
+    "missing_blocking",
+]
+
+
+class ResolvedAssetInfo(BaseModel):
+    role: str
+    logical_id: str
+    resolved_path: str
+    status: AssetStatus
+    format_type: Optional[str] = None  # e.g., "PNG", "JPEG", "TTF", "SVG"
+    dimensions: Optional[Tuple[int, int]] = None  # (width, height)
+    has_alpha: bool = False
+    size_bytes: int = 0
+    sha256_hash: Optional[str] = None
+    is_blocking: bool = False
+    error_message: Optional[str] = None
+
+
+class AssetReadinessReport(BaseModel):
+    is_ready_to_generate: bool
+    blocking_missing_count: int
+    gemini_eligible_missing_count: int
+    assets: Dict[str, ResolvedAssetInfo]
+    summary_messages: List[str]
+````
+
+## File: backend/app/models/generation.py
+````python
+"""Pydantic models for AI Scene Generation and Provenance Metadata."""
+
+from typing import Optional, Tuple, Literal
+from pydantic import BaseModel, Field
+from datetime import datetime, timezone
+
+
+class GeneratedBackgroundMetadata(BaseModel):
+    """Provenance and review metadata for an AI-generated or mock-generated scene background."""
+    background_id: str
+    activity: str
+    territory: str
+    prompt: str
+    negative_prompt: str
+    model_used: str
+    duration_ms: int
+    dimensions: Tuple[int, int] = (2048, 2048)
+    ai_generated_background: bool = True
+    human_review_required: bool = True
+    provenance: Literal["google-genai", "mock-generator"] = "google-genai"
+    is_mock: bool = False
+    generated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    local_path: str
+    remote_storage_path: Optional[str] = None
+
+
+class GenerationRequest(BaseModel):
+    """Request payload to generate a missing background variation."""
+    activity: Literal["beach", "camping", "tailgating"]
+    territory: Optional[str] = None
+    aspect_ratio: Literal["1:1", "16:9", "9:16"] = "1:1"
+    custom_prompt_suffix: Optional[str] = None
+    force_mock: bool = False
+````
+
+## File: backend/app/models/report.py
+````python
+"""Pydantic models for Deterministic Quality Checks and Run Reports (Step 10)."""
+
+from typing import List, Dict, Optional, Tuple, Literal, Any
+from pydantic import BaseModel, Field
+from datetime import datetime, timezone
+
+
+class CheckResult(BaseModel):
+    """Result of a single deterministic quality check rule."""
+    check_id: str
+    check_name: str
+    category: Literal["blocking", "warning", "heuristic"]
+    passed: bool
+    details: str
+    metrics: Optional[Dict[str, Any]] = None
+
+
+class AudienceAudit(BaseModel):
+    """Detailed audit per audience concept and its format renderings."""
+    audience_id: str
+    audience_name: str
+    age_band: str
+    activity: str
+    territory: str
+    product_role: str
+    product_hash: str
+    background_path: str
+    tagline_text: str
+    tagline_color: str
+    contrast_score: float
+    busyness_score: float
+    safe_area_passed: bool
+    aspect_ratio_preserved: bool
+    provenance: str
+    human_review_required: bool
+
+
+class QualityReport(BaseModel):
+    """Deterministic Quality Assurance & Compliance Report."""
+    report_id: str
+    campaign_id: str
+    campaign_name: str
+    run_id: str
+    seed: int
+    generated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    status: Literal["passed", "passed_with_warnings", "failed"]
+    total_checks_run: int
+    blocking_checks_passed: int
+    blocking_checks_total: int
+    warning_count: int
+    checks: List[CheckResult]
+    audience_audits: List[AudienceAudit]
+    warnings: List[str]
+    errors: List[str]
+    provenance_summary: str
+    storage_mode: str
+````
 
 ## File: backend/app/services/storage/firebase_adapter.py
 ````python
@@ -392,256 +544,6 @@ class FirebaseStorageAdapter(StorageAdapter):
                 root=f"gs://{self.bucket_name}",
                 error=str(e),
             )
-````
-
-## File: frontend/src/services/firebase.ts
-````typescript
-/**
- * Firebase Client Configuration & Integration Helpers for YETI Ad Generator.
- *
- * Provides optional Firebase configuration for authentication, Cloud Firestore
- * campaign persistence, and Firebase Cloud Storage media URL resolution.
- * Gracefully operates in offline/local-only mode when Firebase environment
- * variables are not set.
- */
-
-export interface FirebaseConfig {
-  apiKey?: string;
-  authDomain?: string;
-  projectId?: string;
-  storageBucket?: string;
-  messagingSenderId?: string;
-  appId?: string;
-}
-
-export const getFirebaseConfig = (): FirebaseConfig => {
-  const env = (typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string> }).env)
-    ? (import.meta as unknown as { env: Record<string, string> }).env
-    : {};
-
-  return {
-    apiKey: env.VITE_FIREBASE_API_KEY || '',
-    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || '',
-    projectId: env.VITE_FIREBASE_PROJECT_ID || '',
-    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || '',
-    messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-    appId: env.VITE_FIREBASE_APP_ID || '',
-  };
-};
-
-export const isFirebaseConfigured = (): boolean => {
-  const cfg = getFirebaseConfig();
-  return Boolean(cfg.apiKey && cfg.projectId);
-};
-
-export const getStorageDownloadUrl = (remotePath: string): string => {
-  const cfg = getFirebaseConfig();
-  if (cfg.storageBucket) {
-    const clean = remotePath.replace(/^\/+/, '');
-    const encoded = encodeURIComponent(clean);
-    return `https://firebasestorage.googleapis.com/v0/b/${cfg.storageBucket}/o/${encoded}?alt=media`;
-  }
-  return `/outputs/${remotePath.replace(/^\/+/, '')}`;
-};
-````
-
-## File: .dockerignore
-````
-.git
-.venv
-.cache
-.pytest_cache
-node_modules
-frontend/node_modules
-frontend/dist
-outputs
-*.psd
-*.zip
-.DS_Store
-repomix-output.*
-````
-
-## File: Dockerfile
-````dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Install system dependencies for Pillow and image processing
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libjpeg-dev \
-    zlib1g-dev \
-    libpng-dev \
-    libfreetype6-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy and install python dependencies
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy source code and assets
-COPY . .
-
-# Set default port for Cloud Run (defaults to 8080)
-ENV PORT=8080
-ENV HOST=0.0.0.0
-ENV PYTHONPATH=/app
-
-EXPOSE 8080
-
-CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT}"]
-````
-
-## File: backend/app/models/assets.py
-````python
-"""Pydantic models for Asset Catalog and Path Resolution."""
-
-from typing import Optional, Tuple, Literal, List, Dict
-from pydantic import BaseModel, Field
-
-
-AssetRole = Literal[
-    "product_orange",
-    "product_white",
-    "background_beach",
-    "background_camping",
-    "background_tailgating",
-    "tagline_black",
-    "tagline_white",
-    "brand_logo",
-    "font_regular",
-    "font_bold",
-    "layout_reference_1x1",
-    "layout_reference_16x9",
-    "layout_reference_9x16",
-]
-
-AssetStatus = Literal[
-    "local",
-    "cached_from_dropbox",
-    "dropbox_available",
-    "missing_gemini_eligible",
-    "missing_blocking",
-]
-
-
-class ResolvedAssetInfo(BaseModel):
-    role: str
-    logical_id: str
-    resolved_path: str
-    status: AssetStatus
-    format_type: Optional[str] = None  # e.g., "PNG", "JPEG", "TTF", "SVG"
-    dimensions: Optional[Tuple[int, int]] = None  # (width, height)
-    has_alpha: bool = False
-    size_bytes: int = 0
-    sha256_hash: Optional[str] = None
-    is_blocking: bool = False
-    error_message: Optional[str] = None
-
-
-class AssetReadinessReport(BaseModel):
-    is_ready_to_generate: bool
-    blocking_missing_count: int
-    gemini_eligible_missing_count: int
-    assets: Dict[str, ResolvedAssetInfo]
-    summary_messages: List[str]
-````
-
-## File: backend/app/models/generation.py
-````python
-"""Pydantic models for AI Scene Generation and Provenance Metadata."""
-
-from typing import Optional, Tuple, Literal
-from pydantic import BaseModel, Field
-from datetime import datetime, timezone
-
-
-class GeneratedBackgroundMetadata(BaseModel):
-    """Provenance and review metadata for an AI-generated or mock-generated scene background."""
-    background_id: str
-    activity: str
-    territory: str
-    prompt: str
-    negative_prompt: str
-    model_used: str
-    duration_ms: int
-    dimensions: Tuple[int, int] = (2048, 2048)
-    ai_generated_background: bool = True
-    human_review_required: bool = True
-    provenance: Literal["google-genai", "mock-generator"] = "google-genai"
-    is_mock: bool = False
-    generated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    local_path: str
-    remote_storage_path: Optional[str] = None
-
-
-class GenerationRequest(BaseModel):
-    """Request payload to generate a missing background variation."""
-    activity: Literal["beach", "camping", "tailgating"]
-    territory: Optional[str] = None
-    aspect_ratio: Literal["1:1", "16:9", "9:16"] = "1:1"
-    custom_prompt_suffix: Optional[str] = None
-    force_mock: bool = False
-````
-
-## File: backend/app/models/report.py
-````python
-"""Pydantic models for Deterministic Quality Checks and Run Reports (Step 10)."""
-
-from typing import List, Dict, Optional, Tuple, Literal, Any
-from pydantic import BaseModel, Field
-from datetime import datetime, timezone
-
-
-class CheckResult(BaseModel):
-    """Result of a single deterministic quality check rule."""
-    check_id: str
-    check_name: str
-    category: Literal["blocking", "warning", "heuristic"]
-    passed: bool
-    details: str
-    metrics: Optional[Dict[str, Any]] = None
-
-
-class AudienceAudit(BaseModel):
-    """Detailed audit per audience concept and its format renderings."""
-    audience_id: str
-    audience_name: str
-    age_band: str
-    activity: str
-    territory: str
-    product_role: str
-    product_hash: str
-    background_path: str
-    tagline_text: str
-    tagline_color: str
-    contrast_score: float
-    busyness_score: float
-    safe_area_passed: bool
-    aspect_ratio_preserved: bool
-    provenance: str
-    human_review_required: bool
-
-
-class QualityReport(BaseModel):
-    """Deterministic Quality Assurance & Compliance Report."""
-    report_id: str
-    campaign_id: str
-    campaign_name: str
-    run_id: str
-    seed: int
-    generated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    status: Literal["passed", "passed_with_warnings", "failed"]
-    total_checks_run: int
-    blocking_checks_passed: int
-    blocking_checks_total: int
-    warning_count: int
-    checks: List[CheckResult]
-    audience_audits: List[AudienceAudit]
-    warnings: List[str]
-    errors: List[str]
-    provenance_summary: str
-    storage_mode: str
 ````
 
 ## File: backend/app/services/brief_validator.py
@@ -1571,6 +1473,57 @@ export const Header: React.FC = () => {
 };
 ````
 
+## File: frontend/src/services/firebase.ts
+````typescript
+/**
+ * Firebase Client Configuration & Integration Helpers for YETI Ad Generator.
+ *
+ * Provides optional Firebase configuration for authentication, Cloud Firestore
+ * campaign persistence, and Firebase Cloud Storage media URL resolution.
+ * Gracefully operates in offline/local-only mode when Firebase environment
+ * variables are not set.
+ */
+
+export interface FirebaseConfig {
+  apiKey?: string;
+  authDomain?: string;
+  projectId?: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId?: string;
+}
+
+export const getFirebaseConfig = (): FirebaseConfig => {
+  const env = (typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string> }).env)
+    ? (import.meta as unknown as { env: Record<string, string> }).env
+    : {};
+
+  return {
+    apiKey: env.VITE_FIREBASE_API_KEY || '',
+    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || '',
+    projectId: env.VITE_FIREBASE_PROJECT_ID || '',
+    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || '',
+    messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: env.VITE_FIREBASE_APP_ID || '',
+  };
+};
+
+export const isFirebaseConfigured = (): boolean => {
+  const cfg = getFirebaseConfig();
+  return Boolean(cfg.apiKey && cfg.projectId);
+};
+
+export const getStorageDownloadUrl = (remotePath: string): string => {
+  const cfg = getFirebaseConfig();
+  if (cfg.storageBucket) {
+    const clean = remotePath.replace(/^\/+/, '');
+    const encoded = encodeURIComponent(clean);
+    return `https://firebasestorage.googleapis.com/v0/b/${cfg.storageBucket}/o/${encoded}?alt=media`;
+  }
+  return `/outputs/${remotePath.replace(/^\/+/, '')}`;
+};
+````
+
 ## File: frontend/src/test/setup.ts
 ````typescript
 import '@testing-library/jest-dom';
@@ -2071,6 +2024,53 @@ except Exception as e:
     print(f"Request failed: {e}")
 ````
 
+## File: .dockerignore
+````
+.git
+.venv
+.cache
+.pytest_cache
+node_modules
+frontend/node_modules
+frontend/dist
+outputs
+*.psd
+*.zip
+.DS_Store
+repomix-output.*
+````
+
+## File: Dockerfile
+````dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies for Pillow and image processing
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libjpeg-dev \
+    zlib1g-dev \
+    libpng-dev \
+    libfreetype6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install python dependencies
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code and assets
+COPY . .
+
+# Set default port for Cloud Run (defaults to 8080)
+ENV PORT=8080
+ENV HOST=0.0.0.0
+ENV PYTHONPATH=/app
+
+EXPOSE 8080
+
+CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT}"]
+````
+
 ## File: generate_ads.py
 ````python
 #!/usr/bin/env python3
@@ -2157,6 +2157,11 @@ Examples:
         bar = "█" * filled + "░" * (bar_len - filled)
         print(f"\033[90m{pct}\033[0m \033[96m{bar}\033[0m \033[1m{event.stage:<32}\033[0m {event.message}")
 
+    # ==============================================================================
+    # INTERVIEW TRACE: CLI Entry Point
+    # "Trace one campaign from request to output" -> Stage 0: CLI Ingestion
+    # Invokes CampaignPipelineRunner with brief JSON and seed, streaming terminal events
+    # ==============================================================================
     runner = CampaignPipelineRunner(local_base_dir=args.output_dir)
     print("\033[94m[*] Executing Campaign Pipeline...\033[0m")
 
@@ -2206,39 +2211,6 @@ Examples:
 
 if __name__ == "__main__":
     main()
-````
-
-## File: netlify.toml
-````toml
-# Netlify Configuration for YETI Ad Generator Frontend
-
-[build]
-  base = "frontend"
-  command = "npm run build"
-  publish = "dist"
-
-# Proxy /api requests to live Google Cloud Run backend
-[[redirects]]
-  from = "/api/*"
-  to = "https://yeti-ad-backend-545916247776.us-central1.run.app/api/:splat"
-  status = 200
-  force = true
-
-# Proxy /outputs requests to live Google Cloud Run backend
-[[redirects]]
-  from = "/outputs/*"
-  to = "https://yeti-ad-backend-545916247776.us-central1.run.app/outputs/:splat"
-  status = 200
-  force = true
-
-# Redirect SPA routes to index.html for client-side routing
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
-[build.environment]
-  NODE_VERSION = "20"
 ````
 
 ## File: yeti_la_random_ad_campaign_72.json
@@ -2802,192 +2774,6 @@ class CampaignPlanResult(BaseModel):
     concepts: List[AudienceConcept]
     render_plans: List[FormatRenderPlan]
     warnings: List[str] = Field(default_factory=list)
-````
-
-## File: backend/app/services/storage/__init__.py
-````python
-"""Storage Adapter Module for YETI Ad Generator."""
-
-import os
-from typing import Optional
-
-from backend.app.services.storage.base import (
-    StorageAdapter,
-    StorageMetadata,
-    StorageStatus,
-    StorageError,
-    StorageNotFoundError,
-    StorageAuthError,
-    StorageAlreadyExistsError,
-)
-from backend.app.services.storage.local import LocalStorageAdapter
-from backend.app.services.storage.dropbox_adapter import DropboxStorageAdapter
-from backend.app.services.storage.firebase_adapter import FirebaseStorageAdapter
-
-
-def get_storage_adapter(force_local: bool = False) -> StorageAdapter:
-    """
-    Storage factory returning:
-    - LocalStorageAdapter if force_local is True or as default fallback.
-    - FirebaseStorageAdapter if STORAGE_MODE='firebase' or FIREBASE_STORAGE_BUCKET is configured.
-    - DropboxStorageAdapter if DROPBOX_ACCESS_TOKEN or DROPBOX_REFRESH_TOKEN credentials are configured.
-    """
-    if force_local:
-        storage_root = os.getenv("STORAGE_ROOT", "./outputs")
-        return LocalStorageAdapter(root_dir=storage_root)
-
-    storage_mode = os.getenv("STORAGE_MODE", "").lower()
-
-    # 1. Firebase / GCS Storage Mode
-    firebase_bucket = os.getenv("FIREBASE_STORAGE_BUCKET") or os.getenv("GCS_BUCKET_NAME")
-    if storage_mode in ("firebase", "gcs") or (firebase_bucket and storage_mode != "dropbox"):
-        return FirebaseStorageAdapter(bucket_name=firebase_bucket)
-
-    # 2. Dropbox Storage Mode
-    token = os.getenv("DROPBOX_ACCESS_TOKEN")
-    refresh_token = os.getenv("DROPBOX_REFRESH_TOKEN")
-    app_key = os.getenv("DROPBOX_APP_KEY")
-    app_secret = os.getenv("DROPBOX_APP_SECRET")
-
-    is_dbx = bool(token or (refresh_token and app_key and app_secret))
-    if is_dbx:
-        return DropboxStorageAdapter(
-            access_token=token,
-            refresh_token=refresh_token,
-            app_key=app_key,
-            app_secret=app_secret,
-        )
-
-    # 3. Default Local Storage
-    storage_root = os.getenv("STORAGE_ROOT", "./outputs")
-    return LocalStorageAdapter(root_dir=storage_root)
-
-
-__all__ = [
-    "StorageAdapter",
-    "StorageMetadata",
-    "StorageStatus",
-    "StorageError",
-    "StorageNotFoundError",
-    "StorageAuthError",
-    "StorageAlreadyExistsError",
-    "LocalStorageAdapter",
-    "DropboxStorageAdapter",
-    "FirebaseStorageAdapter",
-    "get_storage_adapter",
-]
-````
-
-## File: backend/app/services/storage/base.py
-````python
-"""Abstract Base Class and Models for Storage Adapters."""
-
-import abc
-from typing import List, Optional, Any, Dict
-from pydantic import BaseModel, Field
-
-
-class StorageMetadata(BaseModel):
-    """File or directory metadata within a storage provider."""
-    path: str
-    size_bytes: int = 0
-    content_hash: Optional[str] = None
-    revision: Optional[str] = None
-    modified_at: Optional[str] = None
-    is_directory: bool = False
-
-
-class StorageStatus(BaseModel):
-    """Health and configuration status of the storage provider."""
-    configured: bool
-    reachable: bool
-    mode: str = Field(description="'local', 'dropbox', or 'firebase'")
-    root: str
-    error: Optional[str] = None
-
-
-class StorageError(Exception):
-    """Base exception for storage adapter operations."""
-    pass
-
-
-class StorageNotFoundError(StorageError):
-    """Raised when a requested remote or local path does not exist."""
-    pass
-
-
-class StorageAuthError(StorageError):
-    """Raised on authentication or credential failures."""
-    pass
-
-
-class StorageAlreadyExistsError(StorageError):
-    """Raised when upload attempts to overwrite an existing asset without overwrite=True."""
-    pass
-
-
-class StorageAdapter(abc.ABC):
-    """Abstract interface for file and artifact storage providers."""
-
-    @abc.abstractmethod
-    def exists(self, path: str) -> bool:
-        """Return True if path exists in storage."""
-        pass
-
-    @abc.abstractmethod
-    def get_metadata(self, path: str) -> StorageMetadata:
-        """Retrieve metadata for a specific path."""
-        pass
-
-    @abc.abstractmethod
-    def list_directory(self, path: str, recursive: bool = False) -> List[StorageMetadata]:
-        """List files and folders under path."""
-        pass
-
-    @abc.abstractmethod
-    def download(self, remote_path: str, local_destination_path: str) -> str:
-        """Download remote asset to local destination, returning destination path."""
-        pass
-
-    @abc.abstractmethod
-    def upload(
-        self,
-        local_source_path: str,
-        remote_path: str,
-        overwrite: bool = False,
-    ) -> StorageMetadata:
-        """Upload local file to remote storage."""
-        pass
-
-    @abc.abstractmethod
-    def upload_json(
-        self,
-        data: Any,
-        remote_path: str,
-        overwrite: bool = False,
-    ) -> StorageMetadata:
-        """Serialize data to JSON and upload to remote storage."""
-        pass
-
-    @abc.abstractmethod
-    def read_json(self, remote_path: str) -> Any:
-        """Read and deserialize JSON file from remote storage."""
-        pass
-
-    @abc.abstractmethod
-    def get_temporary_link(self, remote_path: str) -> Optional[str]:
-        """Generate temporary direct download link if supported."""
-        pass
-
-    @abc.abstractmethod
-    def get_shared_folder_link(self, remote_folder_path: str) -> Optional[str]:
-        """Generate web browser link to view the storage folder."""
-        pass
-
-    @abc.abstractmethod
-    def get_status(self) -> StorageStatus:
-        """Return provider readiness and reachability status without exposing secrets."""
-        pass
 ````
 
 ## File: backend/app/services/storage/local.py
@@ -3764,357 +3550,6 @@ def test_blocking_check_fails_on_missing_format_locking(sample_brief, valid_run_
     assert blk_07.passed is False
 ````
 
-## File: backend/tests/test_storage_adapter.py
-````python
-"""Unit and Integration Tests for Storage Adapters (LocalStorageAdapter and DropboxStorageAdapter)."""
-
-import os
-import json
-import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-from datetime import datetime, timezone
-
-from dropbox.files import FileMetadata, FolderMetadata, WriteMode
-from dropbox.exceptions import ApiError, AuthError
-
-from backend.app.services.storage.base import (
-    StorageAdapter,
-    StorageMetadata,
-    StorageStatus,
-    StorageNotFoundError,
-    StorageAlreadyExistsError,
-    StorageAuthError,
-    StorageError,
-)
-from backend.app.services.storage.local import LocalStorageAdapter
-from backend.app.services.storage.dropbox_adapter import DropboxStorageAdapter
-from backend.app.services.storage import get_storage_adapter
-
-
-@pytest.fixture
-def local_storage(tmp_path) -> LocalStorageAdapter:
-    return LocalStorageAdapter(root_dir=str(tmp_path / "storage_root"))
-
-
-def test_local_storage_lifecycle(local_storage, tmp_path):
-    """Test full upload, metadata, list, read_json, download, and overwrite protection."""
-    # 1. Create a dummy local source file
-    src_file = tmp_path / "sample_ad.png"
-    src_file.write_bytes(b"\x89PNG\r\n\x1a\nFakePngData")
-
-    # 2. Upload with overwrite=False
-    meta = local_storage.upload(str(src_file), "campaigns/test/sample_ad.png")
-    assert meta.path == "campaigns/test/sample_ad.png"
-    assert meta.size_bytes == len(b"\x89PNG\r\n\x1a\nFakePngData")
-    assert meta.content_hash is not None
-    assert meta.is_directory is False
-
-    # 3. Verify exists()
-    assert local_storage.exists("campaigns/test/sample_ad.png") is True
-    assert local_storage.exists("campaigns/test/non_existent.png") is False
-
-    # 4. Overwrite protection
-    with pytest.raises(StorageAlreadyExistsError):
-        local_storage.upload(str(src_file), "campaigns/test/sample_ad.png", overwrite=False)
-
-    # 5. Overwrite allowed
-    meta_updated = local_storage.upload(str(src_file), "campaigns/test/sample_ad.png", overwrite=True)
-    assert meta_updated.path == "campaigns/test/sample_ad.png"
-
-    # 6. JSON Upload & Read
-    manifest_data = {
-        "campaignId": "yeti-la-go-anywhere-2026",
-        "runId": "run-20260818-001",
-        "totalAds": 18,
-    }
-    json_meta = local_storage.upload_json(manifest_data, "campaigns/test/generation-manifest.json")
-    assert json_meta.path == "campaigns/test/generation-manifest.json"
-
-    read_back = local_storage.read_json("campaigns/test/generation-manifest.json")
-    assert read_back == manifest_data
-
-    # 7. List Directory
-    entries = local_storage.list_directory("campaigns/test")
-    paths = [e.path for e in entries]
-    assert "campaigns/test/generation-manifest.json" in paths
-    assert "campaigns/test/sample_ad.png" in paths
-
-    # 8. Download
-    dest_download = tmp_path / "downloaded_sample.png"
-    downloaded_path = local_storage.download("campaigns/test/sample_ad.png", str(dest_download))
-    assert Path(downloaded_path).exists()
-    assert Path(downloaded_path).read_bytes() == b"\x89PNG\r\n\x1a\nFakePngData"
-
-    # 9. Status
-    status = local_storage.get_status()
-    assert status.configured is True
-    assert status.reachable is True
-    assert status.mode == "local"
-    assert status.error is None
-
-
-def test_dropbox_adapter_path_normalization():
-    """Verify Dropbox path normalization enforces single campaign root."""
-    adapter = DropboxStorageAdapter(
-        access_token="test_token_123",
-        campaign_root="/yeti-ad-generator",
-    )
-
-    assert adapter.normalize_path("") == "/yeti-ad-generator"
-    assert adapter.normalize_path("briefs/test.json") == "/yeti-ad-generator/briefs/test.json"
-    assert adapter.normalize_path("/yeti-ad-generator/campaigns/c1/run1") == "/yeti-ad-generator/campaigns/c1/run1"
-    assert adapter.normalize_path("yeti-ad-generator/assets/logo.png") == "/yeti-ad-generator/assets/logo.png"
-
-
-def test_dropbox_adapter_status_unconfigured():
-    """Verify unconfigured Dropbox status returns clean non-leaking status."""
-    adapter = DropboxStorageAdapter(access_token=None)
-    status = adapter.get_status()
-    assert status.configured is False
-    assert status.reachable is False
-    assert status.mode == "dropbox"
-    assert "not configured" in status.error.lower()
-
-
-@patch("dropbox.Dropbox")
-def test_dropbox_adapter_mocked_operations(mock_dbx_class, tmp_path):
-    """Test DropboxStorageAdapter operations with mocked official Dropbox client."""
-    mock_dbx = MagicMock()
-    mock_dbx_class.return_value = mock_dbx
-
-    # Mock user account check for status
-    mock_dbx.users_get_current_account.return_value = MagicMock(account_id="acc_123")
-
-    adapter = DropboxStorageAdapter(
-        access_token="dbx_mock_token_secret",
-        campaign_root="/yeti-ad-generator",
-        cache_dir=str(tmp_path / "dbx_cache"),
-    )
-
-    # 1. Test status
-    status = adapter.get_status()
-    assert status.configured is True
-    assert status.reachable is True
-    assert status.mode == "dropbox"
-    assert "token" not in json.dumps(status.model_dump())
-
-    # 2. Mock files_get_metadata
-    mock_file_meta = MagicMock(spec=FileMetadata)
-    mock_file_meta.path_display = "/yeti-ad-generator/campaigns/c1/test-manifest.json"
-    mock_file_meta.size = 1024
-    mock_file_meta.content_hash = "sha_content_hash_abc123"
-    mock_file_meta.rev = "rev_98765"
-    mock_file_meta.server_modified = datetime(2026, 8, 18, 12, 0, 0, tzinfo=timezone.utc)
-    mock_dbx.files_get_metadata.return_value = mock_file_meta
-
-    meta = adapter.get_metadata("campaigns/c1/test-manifest.json")
-    assert meta.path == "campaigns/c1/test-manifest.json"
-    assert meta.size_bytes == 1024
-    assert meta.revision == "rev_98765"
-    assert meta.content_hash == "sha_content_hash_abc123"
-
-    # 3. Test upload_json
-    mock_dbx.files_upload.return_value = mock_file_meta
-    test_manifest = {"campaign": "YETI LA", "status": "approved"}
-    uploaded_meta = adapter.upload_json(
-        test_manifest,
-        "campaigns/c1/test-manifest.json",
-        overwrite=True,
-    )
-    assert uploaded_meta.path == "campaigns/c1/test-manifest.json"
-    mock_dbx.files_upload.assert_called()
-
-    # 4. Test download caching
-    dest_path = tmp_path / "cached_manifest.json"
-    def fake_download(dest_file, path):
-        Path(dest_file).write_text(json.dumps({"mock": True}), encoding="utf-8")
-
-    mock_dbx.files_download_to_file.side_effect = fake_download
-
-    # First download: mock download to file
-    adapter.download("campaigns/c1/test-manifest.json", str(dest_path))
-    mock_dbx.files_download_to_file.assert_called_once()
-    assert dest_path.exists()
-
-    # Reset mock and download again: should hit local revision cache without calling files_download_to_file
-    mock_dbx.files_download_to_file.reset_mock()
-    adapter.download("campaigns/c1/test-manifest.json", str(dest_path))
-    mock_dbx.files_download_to_file.assert_not_called()
-
-
-def test_storage_factory():
-    """Verify get_storage_adapter factory honors environment and force_local flag."""
-    with patch.dict(os.environ, {"DROPBOX_ACCESS_TOKEN": ""}):
-        local_adapter = get_storage_adapter()
-        assert isinstance(local_adapter, LocalStorageAdapter)
-
-    with patch.dict(os.environ, {"DROPBOX_ACCESS_TOKEN": "valid_token"}):
-        dbx_adapter = get_storage_adapter()
-        assert isinstance(dbx_adapter, DropboxStorageAdapter)
-
-        forced_local = get_storage_adapter(force_local=True)
-        assert isinstance(forced_local, LocalStorageAdapter)
-
-
-@patch("dropbox.Dropbox")
-def test_storage_factory_with_refresh_token(mock_dbx_class):
-    """Verify factory initializes Dropbox client with oauth2_refresh_token."""
-    env_vars = {
-        "DROPBOX_ACCESS_TOKEN": "",
-        "DROPBOX_REFRESH_TOKEN": "mock_refresh_token_xyz",
-        "DROPBOX_APP_KEY": "mock_app_key_123",
-        "DROPBOX_APP_SECRET": "mock_app_secret_456",
-        "STORAGE_MODE": "",
-    }
-    with patch.dict(os.environ, env_vars, clear=True):
-        adapter = get_storage_adapter()
-        assert isinstance(adapter, DropboxStorageAdapter)
-        mock_dbx_class.assert_called_with(
-            oauth2_refresh_token="mock_refresh_token_xyz",
-            app_key="mock_app_key_123",
-            app_secret="mock_app_secret_456",
-        )
-
-
-def test_firebase_storage_adapter_initialization():
-    """Verify FirebaseStorageAdapter handles missing credentials and health status gracefully."""
-    from backend.app.services.storage.firebase_adapter import FirebaseStorageAdapter
-
-    # Unconfigured bucket
-    unconfigured = FirebaseStorageAdapter(bucket_name="")
-    status = unconfigured.get_status()
-    assert status.configured is False
-    assert status.mode == "firebase"
-    assert "FIREBASE_STORAGE_BUCKET is not set" in (status.error or "")
-
-    # Configured bucket with mock
-    adapter = FirebaseStorageAdapter(bucket_name="test-bucket.appspot.com")
-    assert adapter.bucket_name == "test-bucket.appspot.com"
-    assert adapter.get_shared_folder_link("runs/run-1") == "https://console.firebase.google.com/project/_/storage/test-bucket.appspot.com/files/~2Fruns/run-1"
-
-
-def test_storage_factory_firebase_mode():
-    """Verify get_storage_adapter returns FirebaseStorageAdapter when STORAGE_MODE is firebase."""
-    from backend.app.services.storage.firebase_adapter import FirebaseStorageAdapter
-
-    env_vars = {
-        "STORAGE_MODE": "firebase",
-        "FIREBASE_STORAGE_BUCKET": "test-yeti-bucket.appspot.com",
-    }
-    with patch.dict(os.environ, env_vars):
-        adapter = get_storage_adapter()
-        assert isinstance(adapter, FirebaseStorageAdapter)
-        assert adapter.bucket_name == "test-yeti-bucket.appspot.com"
-````
-
-## File: frontend/src/components/LightboxModal.tsx
-````typescript
-import React from 'react';
-import { type GeneratedAdArtifact, resolveMediaUrl } from '../services/api';
-
-interface LightboxModalProps {
-  ad: GeneratedAdArtifact | null;
-  onClose: () => void;
-}
-
-export const LightboxModal: React.FC<LightboxModalProps> = ({ ad, onClose }) => {
-  if (!ad) return null;
-
-  return (
-    <div className="modal-overlay-bg" onClick={onClose}>
-      <div
-        className="modal-dialog-box"
-        style={{ maxWidth: '960px', padding: '24px', display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="modal-close-btn"
-          style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 10 }}
-        >
-          ✕
-        </button>
-
-        {/* Image Preview Container */}
-        <div style={{ flex: '1 1 400px', backgroundColor: '#05090E', borderRadius: '8px', border: '1px solid #14202C', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '340px' }}>
-          <img
-            src={resolveMediaUrl(ad.preview_url)}
-            alt={ad.filename}
-            style={{ maxHeight: '65vh', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px', boxShadow: '0 8px 30px rgba(0, 0, 0, 0.8)' }}
-          />
-        </div>
-
-        {/* Ad Details & Download Sidebar */}
-        <div style={{ flex: '0 0 300px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '16px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <span className="badge-run-id">{ad.audience_id}</span>
-              <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#7E93A7' }}>
-                {ad.aspect_ratio} ({ad.dimensions[0]}×{ad.dimensions[1]})
-              </span>
-            </div>
-
-            <h3 style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '800', marginBottom: '4px' }}>{ad.audience_name}</h3>
-            <p style={{ fontSize: '11px', color: '#5E7387', fontFamily: 'var(--font-mono)', marginBottom: '16px' }}>{ad.filename}</p>
-
-            <div style={{ backgroundColor: '#0E1721', border: '1px solid #1C2B3A', borderRadius: '8px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#CAD6E2' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#5E7387' }}>Activity:</span>
-                <span style={{ color: '#00D2FF', textTransform: 'capitalize' }}>{ad.activity}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#5E7387' }}>Territory:</span>
-                <span>{ad.territory}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#5E7387' }}>Age Band:</span>
-                <span style={{ textTransform: 'uppercase' }}>{ad.age_band}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#5E7387' }}>Product:</span>
-                <span style={{ textTransform: 'capitalize' }}>{ad.product_color} Cooler</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#5E7387' }}>File Size:</span>
-                <span>{Math.round(ad.filesize_bytes / 1024)} KB</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#5E7387' }}>Background:</span>
-                <span style={{ color: ad.background_source === 'approved_asset' ? '#31C48D' : '#FDBA74' }}>
-                  {ad.background_source === 'approved_asset' ? 'Approved Asset' : 'AI Generated'}
-                </span>
-              </div>
-            </div>
-
-            {ad.human_review_required && (
-              <div style={{ marginTop: '12px', padding: '10px', backgroundColor: 'rgba(234, 88, 12, 0.15)', border: '1px solid #EA580C', borderRadius: '8px', color: '#FDBA74', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-                ⚠️ <strong>Human Review Required:</strong> AI scene background variant.
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '16px' }}>
-            <a
-              href={resolveMediaUrl(ad.preview_url)}
-              download={ad.filename}
-              className="btn-zip-download"
-              style={{ justifyContent: 'center' }}
-            >
-              <span>📥 Download PNG</span>
-            </a>
-            <button onClick={onClose} className="modal-close-btn" style={{ width: '100%', padding: '10px' }}>
-              Close Preview
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-````
-
 ## File: frontend/src/utils/validation.ts
 ````typescript
 import type { BriefValidationResult } from '../types/campaign';
@@ -4208,6 +3643,39 @@ export default defineConfig({
     },
   },
 })
+````
+
+## File: netlify.toml
+````toml
+# Netlify Configuration for YETI Ad Generator Frontend
+
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "dist"
+
+# Proxy /api requests to live Google Cloud Run backend
+[[redirects]]
+  from = "/api/*"
+  to = "https://yeti-ad-backend-545916247776.us-central1.run.app/api/:splat"
+  status = 200
+  force = true
+
+# Proxy /outputs requests to live Google Cloud Run backend
+[[redirects]]
+  from = "/outputs/*"
+  to = "https://yeti-ad-backend-545916247776.us-central1.run.app/outputs/:splat"
+  status = 200
+  force = true
+
+# Redirect SPA routes to index.html for client-side routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[build.environment]
+  NODE_VERSION = "20"
 ````
 
 ## File: QA_RESULTS.md
@@ -4331,6 +3799,192 @@ npx --prefix frontend oxlint
    - When an asset pool has fewer unique assets than audiences (e.g. 2 camping backgrounds for 3 camping audiences), the system gracefully reuses an approved asset and logs a deterministic warning note rather than aborting the pipeline.
 4. **Storage Graceful Degradation**:
    - When Dropbox credentials are not configured or network requests fail, the pipeline falls back to local storage in `outputs/` without failing the generation run.
+````
+
+## File: backend/app/services/storage/__init__.py
+````python
+"""Storage Adapter Module for YETI Ad Generator."""
+
+import os
+from typing import Optional
+
+from backend.app.services.storage.base import (
+    StorageAdapter,
+    StorageMetadata,
+    StorageStatus,
+    StorageError,
+    StorageNotFoundError,
+    StorageAuthError,
+    StorageAlreadyExistsError,
+)
+from backend.app.services.storage.local import LocalStorageAdapter
+from backend.app.services.storage.dropbox_adapter import DropboxStorageAdapter
+from backend.app.services.storage.firebase_adapter import FirebaseStorageAdapter
+
+
+def get_storage_adapter(force_local: bool = False) -> StorageAdapter:
+    """
+    Storage factory returning:
+    - LocalStorageAdapter if force_local is True or as default fallback.
+    - FirebaseStorageAdapter if STORAGE_MODE='firebase' or FIREBASE_STORAGE_BUCKET is configured.
+    - DropboxStorageAdapter if DROPBOX_ACCESS_TOKEN or DROPBOX_REFRESH_TOKEN credentials are configured.
+    """
+    if force_local:
+        storage_root = os.getenv("STORAGE_ROOT", "./outputs")
+        return LocalStorageAdapter(root_dir=storage_root)
+
+    storage_mode = os.getenv("STORAGE_MODE", "").lower()
+
+    # 1. Firebase / GCS Storage Mode
+    firebase_bucket = os.getenv("FIREBASE_STORAGE_BUCKET") or os.getenv("GCS_BUCKET_NAME")
+    if storage_mode in ("firebase", "gcs") or (firebase_bucket and storage_mode != "dropbox"):
+        return FirebaseStorageAdapter(bucket_name=firebase_bucket)
+
+    # 2. Dropbox Storage Mode
+    token = os.getenv("DROPBOX_ACCESS_TOKEN")
+    refresh_token = os.getenv("DROPBOX_REFRESH_TOKEN")
+    app_key = os.getenv("DROPBOX_APP_KEY")
+    app_secret = os.getenv("DROPBOX_APP_SECRET")
+
+    is_dbx = bool(token or (refresh_token and app_key and app_secret))
+    if is_dbx:
+        return DropboxStorageAdapter(
+            access_token=token,
+            refresh_token=refresh_token,
+            app_key=app_key,
+            app_secret=app_secret,
+        )
+
+    # 3. Default Local Storage
+    storage_root = os.getenv("STORAGE_ROOT", "./outputs")
+    return LocalStorageAdapter(root_dir=storage_root)
+
+
+__all__ = [
+    "StorageAdapter",
+    "StorageMetadata",
+    "StorageStatus",
+    "StorageError",
+    "StorageNotFoundError",
+    "StorageAuthError",
+    "StorageAlreadyExistsError",
+    "LocalStorageAdapter",
+    "DropboxStorageAdapter",
+    "FirebaseStorageAdapter",
+    "get_storage_adapter",
+]
+````
+
+## File: backend/app/services/storage/base.py
+````python
+"""Abstract Base Class and Models for Storage Adapters."""
+
+import abc
+from typing import List, Optional, Any, Dict
+from pydantic import BaseModel, Field
+
+
+class StorageMetadata(BaseModel):
+    """File or directory metadata within a storage provider."""
+    path: str
+    size_bytes: int = 0
+    content_hash: Optional[str] = None
+    revision: Optional[str] = None
+    modified_at: Optional[str] = None
+    is_directory: bool = False
+
+
+class StorageStatus(BaseModel):
+    """Health and configuration status of the storage provider."""
+    configured: bool
+    reachable: bool
+    mode: str = Field(description="'local', 'dropbox', or 'firebase'")
+    root: str
+    error: Optional[str] = None
+
+
+class StorageError(Exception):
+    """Base exception for storage adapter operations."""
+    pass
+
+
+class StorageNotFoundError(StorageError):
+    """Raised when a requested remote or local path does not exist."""
+    pass
+
+
+class StorageAuthError(StorageError):
+    """Raised on authentication or credential failures."""
+    pass
+
+
+class StorageAlreadyExistsError(StorageError):
+    """Raised when upload attempts to overwrite an existing asset without overwrite=True."""
+    pass
+
+
+class StorageAdapter(abc.ABC):
+    """Abstract interface for file and artifact storage providers."""
+
+    @abc.abstractmethod
+    def exists(self, path: str) -> bool:
+        """Return True if path exists in storage."""
+        pass
+
+    @abc.abstractmethod
+    def get_metadata(self, path: str) -> StorageMetadata:
+        """Retrieve metadata for a specific path."""
+        pass
+
+    @abc.abstractmethod
+    def list_directory(self, path: str, recursive: bool = False) -> List[StorageMetadata]:
+        """List files and folders under path."""
+        pass
+
+    @abc.abstractmethod
+    def download(self, remote_path: str, local_destination_path: str) -> str:
+        """Download remote asset to local destination, returning destination path."""
+        pass
+
+    @abc.abstractmethod
+    def upload(
+        self,
+        local_source_path: str,
+        remote_path: str,
+        overwrite: bool = False,
+    ) -> StorageMetadata:
+        """Upload local file to remote storage."""
+        pass
+
+    @abc.abstractmethod
+    def upload_json(
+        self,
+        data: Any,
+        remote_path: str,
+        overwrite: bool = False,
+    ) -> StorageMetadata:
+        """Serialize data to JSON and upload to remote storage."""
+        pass
+
+    @abc.abstractmethod
+    def read_json(self, remote_path: str) -> Any:
+        """Read and deserialize JSON file from remote storage."""
+        pass
+
+    @abc.abstractmethod
+    def get_temporary_link(self, remote_path: str) -> Optional[str]:
+        """Generate temporary direct download link if supported."""
+        pass
+
+    @abc.abstractmethod
+    def get_shared_folder_link(self, remote_folder_path: str) -> Optional[str]:
+        """Generate web browser link to view the storage folder."""
+        pass
+
+    @abc.abstractmethod
+    def get_status(self) -> StorageStatus:
+        """Return provider readiness and reachability status without exposing secrets."""
+        pass
 ````
 
 ## File: backend/app/services/quality_checker.py
@@ -4869,20 +4523,248 @@ def test_full_pipeline_execution(runner, brief_dict):
     assert "Complete" in stages
 ````
 
-## File: backend/requirements.txt
-````
-fastapi>=0.115.0
-uvicorn>=0.30.0
-pydantic>=2.8.0
-pillow>=10.4.0
-python-dotenv>=1.0.0
-pytest>=8.0.0
-pytest-asyncio>=0.23.0
-httpx>=0.27.0
-dropbox>=12.0.0
-google-genai>=1.0.0
-google-cloud-storage>=2.14.0
-firebase-admin>=6.5.0
+## File: backend/tests/test_storage_adapter.py
+````python
+"""Unit and Integration Tests for Storage Adapters (LocalStorageAdapter and DropboxStorageAdapter)."""
+
+import os
+import json
+import pytest
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+from datetime import datetime, timezone
+
+from dropbox.files import FileMetadata, FolderMetadata, WriteMode
+from dropbox.exceptions import ApiError, AuthError
+
+from backend.app.services.storage.base import (
+    StorageAdapter,
+    StorageMetadata,
+    StorageStatus,
+    StorageNotFoundError,
+    StorageAlreadyExistsError,
+    StorageAuthError,
+    StorageError,
+)
+from backend.app.services.storage.local import LocalStorageAdapter
+from backend.app.services.storage.dropbox_adapter import DropboxStorageAdapter
+from backend.app.services.storage import get_storage_adapter
+
+
+@pytest.fixture
+def local_storage(tmp_path) -> LocalStorageAdapter:
+    return LocalStorageAdapter(root_dir=str(tmp_path / "storage_root"))
+
+
+def test_local_storage_lifecycle(local_storage, tmp_path):
+    """Test full upload, metadata, list, read_json, download, and overwrite protection."""
+    # 1. Create a dummy local source file
+    src_file = tmp_path / "sample_ad.png"
+    src_file.write_bytes(b"\x89PNG\r\n\x1a\nFakePngData")
+
+    # 2. Upload with overwrite=False
+    meta = local_storage.upload(str(src_file), "campaigns/test/sample_ad.png")
+    assert meta.path == "campaigns/test/sample_ad.png"
+    assert meta.size_bytes == len(b"\x89PNG\r\n\x1a\nFakePngData")
+    assert meta.content_hash is not None
+    assert meta.is_directory is False
+
+    # 3. Verify exists()
+    assert local_storage.exists("campaigns/test/sample_ad.png") is True
+    assert local_storage.exists("campaigns/test/non_existent.png") is False
+
+    # 4. Overwrite protection
+    with pytest.raises(StorageAlreadyExistsError):
+        local_storage.upload(str(src_file), "campaigns/test/sample_ad.png", overwrite=False)
+
+    # 5. Overwrite allowed
+    meta_updated = local_storage.upload(str(src_file), "campaigns/test/sample_ad.png", overwrite=True)
+    assert meta_updated.path == "campaigns/test/sample_ad.png"
+
+    # 6. JSON Upload & Read
+    manifest_data = {
+        "campaignId": "yeti-la-go-anywhere-2026",
+        "runId": "run-20260818-001",
+        "totalAds": 18,
+    }
+    json_meta = local_storage.upload_json(manifest_data, "campaigns/test/generation-manifest.json")
+    assert json_meta.path == "campaigns/test/generation-manifest.json"
+
+    read_back = local_storage.read_json("campaigns/test/generation-manifest.json")
+    assert read_back == manifest_data
+
+    # 7. List Directory
+    entries = local_storage.list_directory("campaigns/test")
+    paths = [e.path for e in entries]
+    assert "campaigns/test/generation-manifest.json" in paths
+    assert "campaigns/test/sample_ad.png" in paths
+
+    # 8. Download
+    dest_download = tmp_path / "downloaded_sample.png"
+    downloaded_path = local_storage.download("campaigns/test/sample_ad.png", str(dest_download))
+    assert Path(downloaded_path).exists()
+    assert Path(downloaded_path).read_bytes() == b"\x89PNG\r\n\x1a\nFakePngData"
+
+    # 9. Status
+    status = local_storage.get_status()
+    assert status.configured is True
+    assert status.reachable is True
+    assert status.mode == "local"
+    assert status.error is None
+
+
+def test_dropbox_adapter_path_normalization():
+    """Verify Dropbox path normalization enforces single campaign root."""
+    adapter = DropboxStorageAdapter(
+        access_token="test_token_123",
+        campaign_root="/yeti-ad-generator",
+    )
+
+    assert adapter.normalize_path("") == "/yeti-ad-generator"
+    assert adapter.normalize_path("briefs/test.json") == "/yeti-ad-generator/briefs/test.json"
+    assert adapter.normalize_path("/yeti-ad-generator/campaigns/c1/run1") == "/yeti-ad-generator/campaigns/c1/run1"
+    assert adapter.normalize_path("yeti-ad-generator/assets/logo.png") == "/yeti-ad-generator/assets/logo.png"
+
+
+def test_dropbox_adapter_status_unconfigured():
+    """Verify unconfigured Dropbox status returns clean non-leaking status."""
+    adapter = DropboxStorageAdapter(access_token=None)
+    status = adapter.get_status()
+    assert status.configured is False
+    assert status.reachable is False
+    assert status.mode == "dropbox"
+    assert "not configured" in status.error.lower()
+
+
+@patch("dropbox.Dropbox")
+def test_dropbox_adapter_mocked_operations(mock_dbx_class, tmp_path):
+    """Test DropboxStorageAdapter operations with mocked official Dropbox client."""
+    mock_dbx = MagicMock()
+    mock_dbx_class.return_value = mock_dbx
+
+    # Mock user account check for status
+    mock_dbx.users_get_current_account.return_value = MagicMock(account_id="acc_123")
+
+    adapter = DropboxStorageAdapter(
+        access_token="dbx_mock_token_secret",
+        campaign_root="/yeti-ad-generator",
+        cache_dir=str(tmp_path / "dbx_cache"),
+    )
+
+    # 1. Test status
+    status = adapter.get_status()
+    assert status.configured is True
+    assert status.reachable is True
+    assert status.mode == "dropbox"
+    assert "token" not in json.dumps(status.model_dump())
+
+    # 2. Mock files_get_metadata
+    mock_file_meta = MagicMock(spec=FileMetadata)
+    mock_file_meta.path_display = "/yeti-ad-generator/campaigns/c1/test-manifest.json"
+    mock_file_meta.size = 1024
+    mock_file_meta.content_hash = "sha_content_hash_abc123"
+    mock_file_meta.rev = "rev_98765"
+    mock_file_meta.server_modified = datetime(2026, 8, 18, 12, 0, 0, tzinfo=timezone.utc)
+    mock_dbx.files_get_metadata.return_value = mock_file_meta
+
+    meta = adapter.get_metadata("campaigns/c1/test-manifest.json")
+    assert meta.path == "campaigns/c1/test-manifest.json"
+    assert meta.size_bytes == 1024
+    assert meta.revision == "rev_98765"
+    assert meta.content_hash == "sha_content_hash_abc123"
+
+    # 3. Test upload_json
+    mock_dbx.files_upload.return_value = mock_file_meta
+    test_manifest = {"campaign": "YETI LA", "status": "approved"}
+    uploaded_meta = adapter.upload_json(
+        test_manifest,
+        "campaigns/c1/test-manifest.json",
+        overwrite=True,
+    )
+    assert uploaded_meta.path == "campaigns/c1/test-manifest.json"
+    mock_dbx.files_upload.assert_called()
+
+    # 4. Test download caching
+    dest_path = tmp_path / "cached_manifest.json"
+    def fake_download(dest_file, path):
+        Path(dest_file).write_text(json.dumps({"mock": True}), encoding="utf-8")
+
+    mock_dbx.files_download_to_file.side_effect = fake_download
+
+    # First download: mock download to file
+    adapter.download("campaigns/c1/test-manifest.json", str(dest_path))
+    mock_dbx.files_download_to_file.assert_called_once()
+    assert dest_path.exists()
+
+    # Reset mock and download again: should hit local revision cache without calling files_download_to_file
+    mock_dbx.files_download_to_file.reset_mock()
+    adapter.download("campaigns/c1/test-manifest.json", str(dest_path))
+    mock_dbx.files_download_to_file.assert_not_called()
+
+
+def test_storage_factory():
+    """Verify get_storage_adapter factory honors environment and force_local flag."""
+    with patch.dict(os.environ, {"DROPBOX_ACCESS_TOKEN": ""}):
+        local_adapter = get_storage_adapter()
+        assert isinstance(local_adapter, LocalStorageAdapter)
+
+    with patch.dict(os.environ, {"DROPBOX_ACCESS_TOKEN": "valid_token"}):
+        dbx_adapter = get_storage_adapter()
+        assert isinstance(dbx_adapter, DropboxStorageAdapter)
+
+        forced_local = get_storage_adapter(force_local=True)
+        assert isinstance(forced_local, LocalStorageAdapter)
+
+
+@patch("dropbox.Dropbox")
+def test_storage_factory_with_refresh_token(mock_dbx_class):
+    """Verify factory initializes Dropbox client with oauth2_refresh_token."""
+    env_vars = {
+        "DROPBOX_ACCESS_TOKEN": "",
+        "DROPBOX_REFRESH_TOKEN": "mock_refresh_token_xyz",
+        "DROPBOX_APP_KEY": "mock_app_key_123",
+        "DROPBOX_APP_SECRET": "mock_app_secret_456",
+        "STORAGE_MODE": "",
+    }
+    with patch.dict(os.environ, env_vars, clear=True):
+        adapter = get_storage_adapter()
+        assert isinstance(adapter, DropboxStorageAdapter)
+        mock_dbx_class.assert_called_with(
+            oauth2_refresh_token="mock_refresh_token_xyz",
+            app_key="mock_app_key_123",
+            app_secret="mock_app_secret_456",
+        )
+
+
+def test_firebase_storage_adapter_initialization():
+    """Verify FirebaseStorageAdapter handles missing credentials and health status gracefully."""
+    from backend.app.services.storage.firebase_adapter import FirebaseStorageAdapter
+
+    # Unconfigured bucket
+    unconfigured = FirebaseStorageAdapter(bucket_name="")
+    status = unconfigured.get_status()
+    assert status.configured is False
+    assert status.mode == "firebase"
+    assert "FIREBASE_STORAGE_BUCKET is not set" in (status.error or "")
+
+    # Configured bucket with mock
+    adapter = FirebaseStorageAdapter(bucket_name="test-bucket.appspot.com")
+    assert adapter.bucket_name == "test-bucket.appspot.com"
+    assert adapter.get_shared_folder_link("runs/run-1") == "https://console.firebase.google.com/project/_/storage/test-bucket.appspot.com/files/~2Fruns/run-1"
+
+
+def test_storage_factory_firebase_mode():
+    """Verify get_storage_adapter returns FirebaseStorageAdapter when STORAGE_MODE is firebase."""
+    from backend.app.services.storage.firebase_adapter import FirebaseStorageAdapter
+
+    env_vars = {
+        "STORAGE_MODE": "firebase",
+        "FIREBASE_STORAGE_BUCKET": "test-yeti-bucket.appspot.com",
+    }
+    with patch.dict(os.environ, env_vars):
+        adapter = get_storage_adapter()
+        assert isinstance(adapter, FirebaseStorageAdapter)
+        assert adapter.bucket_name == "test-yeti-bucket.appspot.com"
 ````
 
 ## File: frontend/src/components/AssetReadiness.tsx
@@ -5052,78 +4934,6 @@ export const AssetReadiness: React.FC = () => {
         </div>
       )}
     </section>
-  );
-};
-````
-
-## File: frontend/src/components/ContactSheetModal.tsx
-````typescript
-import React from 'react';
-import { resolveMediaUrl } from '../services/api';
-
-interface ContactSheetModalProps {
-  isOpen: boolean;
-  contactSheetUrl: string | null;
-  campaignName: string;
-  runId: string;
-  onClose: () => void;
-}
-
-export const ContactSheetModal: React.FC<ContactSheetModalProps> = ({
-  isOpen,
-  contactSheetUrl,
-  campaignName,
-  runId,
-  onClose,
-}) => {
-  if (!isOpen || !contactSheetUrl) return null;
-
-  const fullContactSheetUrl = resolveMediaUrl(contactSheetUrl);
-
-  return (
-    <div className="modal-overlay-bg" onClick={onClose}>
-      <div
-        className="modal-dialog-box"
-        style={{ maxWidth: '1100px', height: '90vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="modal-header-bar">
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#00D2FF', fontFamily: 'var(--font-mono)', fontWeight: 'bold', letterSpacing: '0.1em' }}>YETI</span>
-              <h2 style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '800' }}>Campaign Contact Sheet</h2>
-            </div>
-            <p style={{ color: '#7E93A7', fontSize: '11px', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
-              {campaignName} | Run: {runId} | Master Multi-Format Overview
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <a
-              href={fullContactSheetUrl}
-              download="yeti_campaign_contact_sheet.jpg"
-              className="btn-zip-download"
-              style={{ padding: '6px 14px', fontSize: '11px' }}
-            >
-              📥 Download JPG
-            </a>
-            <button onClick={onClose} className="modal-close-btn">
-              Close
-            </button>
-          </div>
-        </div>
-
-        {/* High-res Image Scrollable Area */}
-        <div className="modal-content-area" style={{ backgroundColor: '#05090E', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
-          <img
-            src={fullContactSheetUrl}
-            alt="YETI Campaign Contact Sheet"
-            style={{ maxWidth: '100%', height: 'auto', borderRadius: '6px', boxShadow: '0 10px 40px rgba(0, 0, 0, 0.8)' }}
-          />
-        </div>
-      </div>
-    </div>
   );
 };
 ````
@@ -5385,203 +5195,106 @@ export const IntegrationStatus: React.FC = () => {
 };
 ````
 
-## File: frontend/src/components/QualityReportModal.tsx
+## File: frontend/src/components/LightboxModal.tsx
 ````typescript
 import React from 'react';
-import { resolveMediaUrl } from '../services/api';
+import { type GeneratedAdArtifact, resolveMediaUrl } from '../services/api';
 
-interface QualityReportModalProps {
-  isOpen: boolean;
-  report: any;
-  reportUrl?: string;
-  manifestUrl?: string;
-  logUrl?: string;
+interface LightboxModalProps {
+  ad: GeneratedAdArtifact | null;
   onClose: () => void;
 }
 
-export const QualityReportModal: React.FC<QualityReportModalProps> = ({
-  isOpen,
-  report,
-  reportUrl,
-  manifestUrl,
-  logUrl,
-  onClose,
-}) => {
-  if (!isOpen || !report) return null;
-
-  const checks = report.checks || [];
-  const audits = report.audience_audits || [];
-  const blockingPassed = report.blocking_checks_passed || 8;
-  const blockingTotal = report.blocking_checks_total || 8;
+export const LightboxModal: React.FC<LightboxModalProps> = ({ ad, onClose }) => {
+  if (!ad) return null;
 
   return (
     <div className="modal-overlay-bg" onClick={onClose}>
       <div
         className="modal-dialog-box"
-        style={{ maxWidth: '1000px', maxHeight: '90vh' }}
+        style={{ maxWidth: '960px', padding: '24px', display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="modal-header-bar">
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#00D2FF', fontFamily: 'var(--font-mono)', fontWeight: 'bold', letterSpacing: '0.1em' }}>YETI QA</span>
-              <h2 style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '800' }}>Deterministic Quality & Compliance Report</h2>
-            </div>
-            <p style={{ color: '#7E93A7', fontSize: '11px', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
-              Run: {report.run_id} | Seed: {report.seed} | Status: <span style={{ color: '#31C48D', fontWeight: 'bold', textTransform: 'uppercase' }}>{report.status}</span>
-            </p>
-          </div>
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="modal-close-btn"
+          style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 10 }}
+        >
+          ✕
+        </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {manifestUrl && (
-              <a
-                href={resolveMediaUrl(manifestUrl)}
-                download="generation-manifest.json"
-                className="btn-zip-download"
-                style={{ padding: '6px 12px', fontSize: '11px' }}
-              >
-                📋 Manifest JSON
-              </a>
-            )}
-            {reportUrl && (
-              <a
-                href={resolveMediaUrl(reportUrl)}
-                download="generation-report.json"
-                className="btn-contact-sheet-action"
-                style={{ padding: '6px 12px', fontSize: '11px' }}
-              >
-                📥 Report JSON
-              </a>
-            )}
-            {logUrl && (
-              <a
-                href={resolveMediaUrl(logUrl)}
-                download="pipeline.log"
-                className="btn-contact-sheet-action"
-                style={{ padding: '6px 12px', fontSize: '11px' }}
-              >
-                📜 Pipeline Log (JSONL)
-              </a>
-            )}
-            <button onClick={onClose} className="modal-close-btn">
-              Close
-            </button>
-          </div>
+        {/* Image Preview Container */}
+        <div style={{ flex: '1 1 400px', backgroundColor: '#05090E', borderRadius: '8px', border: '1px solid #14202C', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '340px' }}>
+          <img
+            src={resolveMediaUrl(ad.preview_url)}
+            alt={ad.filename}
+            style={{ maxHeight: '65vh', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px', boxShadow: '0 8px 30px rgba(0, 0, 0, 0.8)' }}
+          />
         </div>
 
-
-        {/* Content Area */}
-        <div className="modal-content-area" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Status Banner */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#070E16', border: '1px solid #1A2B3D', borderRadius: '8px', padding: '14px 18px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '24px' }}>🛡️</span>
-              <div>
-                <div style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: '14px' }}>
-                  {blockingPassed}/{blockingTotal} Blocking Rules Verified & Passed
-                </div>
-                <div style={{ color: '#7E93A7', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-                  Deterministic verification executed across brief, {report.total_concepts || report.audience_audits?.length || 'all'} concept plans, and {report.total_outputs || checks.find((c: any) => c.rule_id === 'BLK-01')?.actual_count || 'all'} rendered ad compositions.
-                </div>
-
-              </div>
-            </div>
-            <span className="badge-count" style={{ fontSize: '12px', padding: '4px 10px' }}>
-              PASSED
-            </span>
-          </div>
-
-          {/* 8 Blocking Checks Grid */}
+        {/* Ad Details & Download Sidebar */}
+        <div style={{ flex: '0 0 300px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '16px' }}>
           <div>
-            <h3 style={{ color: '#00D2FF', fontSize: '13px', fontFamily: 'var(--font-mono)', fontWeight: 'bold', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
-              Deterministic Blocking Checks
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '10px' }}>
-              {checks.map((chk: any) => (
-                <div
-                  key={chk.check_id}
-                  style={{
-                    backgroundColor: '#09111A',
-                    border: `1px solid ${chk.passed ? '#152535' : '#E02424'}`,
-                    borderRadius: '6px',
-                    padding: '10px 14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ color: chk.passed ? '#31C48D' : '#E02424', fontWeight: 'bold' }}>
-                        {chk.passed ? '✓' : '✗'}
-                      </span>
-                      <span style={{ color: '#FFFFFF', fontSize: '12px', fontWeight: 'bold' }}>{chk.check_name}</span>
-                    </div>
-                    <span style={{ color: chk.category === 'blocking' ? '#00D2FF' : '#FDBA74', fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>
-                      {chk.category}
-                    </span>
-                  </div>
-                  <p style={{ color: '#7E93A7', fontSize: '11px', fontFamily: 'var(--font-mono)', margin: 0 }}>
-                    {chk.details}
-                  </p>
-                </div>
-              ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span className="badge-run-id">{ad.audience_id}</span>
+              <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#7E93A7' }}>
+                {ad.aspect_ratio} ({ad.dimensions[0]}×{ad.dimensions[1]})
+              </span>
             </div>
-          </div>
 
-          {/* Per-Audience Audit Table */}
-          {audits.length > 0 && (
-            <div>
-              <h3 style={{ color: '#00D2FF', fontSize: '13px', fontFamily: 'var(--font-mono)', fontWeight: 'bold', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
-                Per-Audience Concept & Quality Audit (6 Audiences)
-              </h3>
-              <div style={{ overflowX: 'auto', border: '1px solid #182635', borderRadius: '8px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', fontFamily: 'var(--font-mono)', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#0A131C', color: '#8EA4B8', borderBottom: '1px solid #182635' }}>
-                      <th style={{ padding: '10px 12px' }}>Audience</th>
-                      <th style={{ padding: '10px 12px' }}>Age</th>
-                      <th style={{ padding: '10px 12px' }}>Activity</th>
-                      <th style={{ padding: '10px 12px' }}>Product</th>
-                      <th style={{ padding: '10px 12px' }}>Tagline</th>
-                      <th style={{ padding: '10px 12px' }}>Contrast</th>
-                      <th style={{ padding: '10px 12px' }}>Busyness</th>
-                      <th style={{ padding: '10px 12px' }}>Provenance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {audits.map((a: any) => (
-                      <tr key={a.audience_id} style={{ borderBottom: '1px solid #101B26', color: '#CAD6E2' }}>
-                        <td style={{ padding: '10px 12px', fontWeight: 'bold', color: '#FFFFFF' }}>{a.audience_id} ({a.territory})</td>
-                        <td style={{ padding: '10px 12px' }}>{a.age_band.toUpperCase()}</td>
-                        <td style={{ padding: '10px 12px', textTransform: 'capitalize' }}>{a.activity}</td>
-                        <td style={{ padding: '10px 12px' }}>
-                          <span style={{ color: a.product_role.includes('orange') ? '#FF8A00' : '#E2E8F0' }}>
-                            {a.product_role.includes('orange') ? 'Orange' : 'White'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px 12px' }}>
-                          <span style={{ color: a.tagline_color === '#000000' ? '#94A3B8' : '#FFFFFF' }}>
-                            {a.tagline_color === '#000000' ? 'Black' : 'White'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px 12px', color: a.contrast_score >= 3.0 ? '#31C48D' : '#FDBA74' }}>
-                          {a.contrast_score}:1
-                        </td>
-                        <td style={{ padding: '10px 12px' }}>{a.busyness_score}</td>
-                        <td style={{ padding: '10px 12px' }}>
-                          <span style={{ color: a.provenance.includes('Gemini') ? '#FDBA74' : '#31C48D' }}>
-                            {a.provenance}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <h3 style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '800', marginBottom: '4px' }}>{ad.audience_name}</h3>
+            <p style={{ fontSize: '11px', color: '#5E7387', fontFamily: 'var(--font-mono)', marginBottom: '16px' }}>{ad.filename}</p>
+
+            <div style={{ backgroundColor: '#0E1721', border: '1px solid #1C2B3A', borderRadius: '8px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#CAD6E2' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#5E7387' }}>Activity:</span>
+                <span style={{ color: '#00D2FF', textTransform: 'capitalize' }}>{ad.activity}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#5E7387' }}>Territory:</span>
+                <span>{ad.territory}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#5E7387' }}>Age Band:</span>
+                <span style={{ textTransform: 'uppercase' }}>{ad.age_band}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#5E7387' }}>Product:</span>
+                <span style={{ textTransform: 'capitalize' }}>{ad.product_color} Cooler</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#5E7387' }}>File Size:</span>
+                <span>{Math.round(ad.filesize_bytes / 1024)} KB</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#5E7387' }}>Background:</span>
+                <span style={{ color: ad.background_source === 'approved_asset' ? '#31C48D' : '#FDBA74' }}>
+                  {ad.background_source === 'approved_asset' ? 'Approved Asset' : 'AI Generated'}
+                </span>
               </div>
             </div>
-          )}
+
+            {ad.human_review_required && (
+              <div style={{ marginTop: '12px', padding: '10px', backgroundColor: 'rgba(234, 88, 12, 0.15)', border: '1px solid #EA580C', borderRadius: '8px', color: '#FDBA74', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                ⚠️ <strong>Human Review Required:</strong> AI scene background variant.
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '16px' }}>
+            <a
+              href={resolveMediaUrl(ad.preview_url)}
+              download={ad.filename}
+              className="btn-zip-download"
+              style={{ justifyContent: 'center' }}
+            >
+              <span>📥 Download PNG</span>
+            </a>
+            <button onClick={onClose} className="modal-close-btn" style={{ width: '100%', padding: '10px' }}>
+              Close Preview
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -7079,66 +6792,6 @@ body {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-````
-
-## File: .gitignore
-````
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
-
-# Production / Build
-dist/
-build/
-
-# Large Design Files (>100MB GitHub limit)
-YETI_Sample_AD.psd
-*.psd
-
-# Environment & secrets
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-*.pem
-*.key
-
-# Python & Cache
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-.venv/
-.cache/
-.dropbox_cache/
-
-# Outputs & temporary generation files
-outputs/*
-!outputs/.gitkeep
-!outputs/test_fixtures/
-!outputs/test_fixtures/*
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-*.log
-
-# OS / Editor
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
-
-# Local Netlify folder
-.netlify
 ````
 
 ## File: yeti_la_random_ad_campaign_36.json
@@ -8759,308 +8412,20 @@ class GeminiBackgroundGenerator:
             )
 ````
 
-## File: frontend/src/components/CampaignResultsView.tsx
-````typescript
-import React, { useState, useMemo } from 'react';
-import { type CampaignRunResult, type GeneratedAdArtifact, resolveMediaUrl } from '../services/api';
-
-interface CampaignResultsViewProps {
-  result: CampaignRunResult;
-  onOpenLightbox: (ad: GeneratedAdArtifact) => void;
-  onOpenContactSheet: () => void;
-  onOpenQualityReport?: () => void;
-  onReRun: () => void;
-}
-
-export const CampaignResultsView: React.FC<CampaignResultsViewProps> = ({
-  result,
-  onOpenLightbox,
-  onOpenContactSheet,
-  onOpenQualityReport,
-  onReRun,
-}) => {
-
-  // Filter states
-  const [selectedActivity, setSelectedActivity] = useState<string>('all');
-  const [selectedProductColor, setSelectedProductColor] = useState<string>('all');
-  const [selectedFormat, setSelectedFormat] = useState<string>('all');
-
-  // Filtered concepts and ads
-  const filteredConcepts = useMemo(() => {
-    return result.concepts.filter((concept) => {
-      if (selectedActivity !== 'all' && concept.activity.toLowerCase() !== selectedActivity.toLowerCase()) {
-        return false;
-      }
-      const prodColor = concept.product_role.includes('orange') ? 'orange' : 'white';
-      if (selectedProductColor !== 'all' && prodColor !== selectedProductColor) {
-        return false;
-      }
-      return true;
-    });
-  }, [result.concepts, selectedActivity, selectedProductColor]);
-
-  // Group ads by concept_id
-  const adsByConcept = useMemo(() => {
-    const map: Record<string, GeneratedAdArtifact[]> = {};
-    for (const ad of result.ads) {
-      if (!map[ad.concept_id]) map[ad.concept_id] = [];
-      if (selectedFormat === 'all' || ad.aspect_ratio === selectedFormat) {
-        map[ad.concept_id].push(ad);
-      }
-    }
-    return map;
-  }, [result.ads, selectedFormat]);
-
-  return (
-    <div className="results-container" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* 1. Campaign Run Header Summary Banner */}
-      <div className="results-header-card">
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
-          <div>
-            <div className="results-meta-row">
-              <span className="badge-run-id">RUN: {result.run_id}</span>
-              <span className="badge-seed">SEED: {result.seed}</span>
-              <span className="badge-count">{result.total_outputs || result.ads.length} ADS GENERATED</span>
-              <span className="badge-seed">⏱️ {result.duration_seconds}s</span>
-            </div>
-            <h2 className="results-title">{result.campaign_name}</h2>
-            <p className="results-provenance-text">{result.provenance_summary}</p>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="results-action-group">
-            {result.zip_bundle_download_url && (
-              <a href={resolveMediaUrl(result.zip_bundle_download_url)} download className="btn-zip-download">
-                <span>📥</span>
-                <span>DOWNLOAD ALL {result.total_outputs || result.ads.length} ADS (ZIP)</span>
-              </a>
-            )}
-
-            {result.contact_sheet_preview_url && (
-              <button onClick={onOpenContactSheet} className="btn-contact-sheet-action">
-                <span>🖼️</span>
-                <span>VIEW CONTACT SHEET</span>
-              </button>
-            )}
-
-            {result.quality_report && (
-              <button
-                onClick={onOpenQualityReport}
-                className="btn-contact-sheet-action"
-                style={{ color: '#31C48D', borderColor: 'rgba(14, 159, 110, 0.4)' }}
-              >
-                <span>🛡️</span>
-                <span>QUALITY REPORT ({result.quality_report.blocking_checks_passed || 8}/8)</span>
-              </button>
-            )}
-
-            <button
-              onClick={onReRun}
-              className="btn-contact-sheet-action"
-              style={{ color: '#00D2FF', borderColor: 'rgba(0, 210, 255, 0.4)' }}
-            >
-              <span>🔄</span>
-              <span>RUN NEW BATCH</span>
-            </button>
-
-          </div>
-        </div>
-
-        {/* Dropbox Storage / Provenance Status Bar */}
-        <div className="results-storage-footer">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: '#00D2FF', fontWeight: 'bold' }}>Storage:</span>
-            <span style={{ color: '#FFFFFF', textTransform: 'capitalize' }}>{result.storage_mode}</span>
-            {result.dropbox_folder_path && (
-              <span style={{ color: '#5E7387' }}>({result.dropbox_folder_path})</span>
-            )}
-          </div>
-
-          {result.dropbox_shared_link ? (
-            <a
-              href={result.dropbox_shared_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="dropbox-link-btn"
-            >
-              <span>🔗</span>
-              <span>Open in Dropbox Folder</span>
-            </a>
-          ) : (
-            <span style={{ color: '#5E7387' }}>Dropbox App Folder Synced</span>
-          )}
-        </div>
-      </div>
-
-      {/* 2. Filter Controls */}
-      <div className="results-filter-bar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ color: '#00D2FF', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-            Filter Ads:
-          </span>
-        </div>
-
-        <div className="filter-group-items">
-          {/* Activity Filter */}
-          <div className="filter-select-item">
-            <span>Activity:</span>
-            <select
-              value={selectedActivity}
-              onChange={(e) => setSelectedActivity(e.target.value)}
-              className="filter-dropdown"
-            >
-              <option value="all">All Activities ({result.concepts.length})</option>
-
-              <option value="beach">Beach</option>
-              <option value="camping">Camping</option>
-              <option value="tailgating">Tailgating</option>
-            </select>
-          </div>
-
-          {/* Product Color Filter */}
-          <div className="filter-select-item">
-            <span>Product:</span>
-            <select
-              value={selectedProductColor}
-              onChange={(e) => setSelectedProductColor(e.target.value)}
-              className="filter-dropdown"
-            >
-              <option value="all">All Colors</option>
-              <option value="orange">Orange Cooler (Younger 20–24)</option>
-              <option value="white">White Cooler (Older 25–30)</option>
-            </select>
-          </div>
-
-          {/* Format Filter */}
-          <div className="filter-select-item">
-            <span>Format:</span>
-            <select
-              value={selectedFormat}
-              onChange={(e) => setSelectedFormat(e.target.value)}
-              className="filter-dropdown"
-            >
-              <option value="all">All 3 Formats (1:1, 16:9, 9:16)</option>
-              <option value="1:1">1:1 Square (1080×1080)</option>
-              <option value="16:9">16:9 Landscape (1920×1080)</option>
-              <option value="9:16">9:16 Vertical (1080×1920)</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Six Concept Cards (One per Audience) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        {filteredConcepts.map((concept) => {
-          const conceptAds = adsByConcept[concept.concept_id] || [];
-          const isOrange = concept.product_role.includes('orange');
-          const isYounger = concept.age_band === 'younger';
-          const bgFilename = concept.selected_background_path.split('/').pop() || '';
-          const hasGeminiBg = result.gemini_audiences.includes(concept.audience_id);
-
-          return (
-            <div key={concept.concept_id} className="concept-card">
-              {/* Concept Metadata Header */}
-              <div className="concept-header-row">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span className="badge-run-id" style={{ fontSize: '13px', padding: '4px 10px' }}>
-                    {concept.audience_id}
-                  </span>
-                  <div>
-                    <h3 className="concept-audience-title">{concept.audience_name}</h3>
-                    <p className="concept-audience-subtitle">
-                      Territory: <span style={{ color: '#E2E8F0' }}>{concept.territory}</span> | Seed: {concept.seed_used}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Concept Badges */}
-                <div className="concept-badge-list">
-                  <span className={isYounger ? 'badge-age-younger' : 'badge-age-older'}>
-                    {isYounger ? 'AGE 20–24 (YOUNGER)' : 'AGE 25–30 (OLDER)'}
-                  </span>
-
-                  <span className={isOrange ? 'badge-product-orange' : 'badge-product-white'}>
-                    {isOrange ? 'ORANGE COOLER' : 'WHITE COOLER'}
-                  </span>
-
-                  <span className="badge-seed" style={{ textTransform: 'uppercase', color: '#00D2FF' }}>
-                    {concept.activity}
-                  </span>
-
-                  <span className="badge-seed">
-                    TAGLINE: {concept.selected_tagline_text} ({concept.tagline_color_hex === '#000000' ? 'BLACK' : 'WHITE'})
-                  </span>
-
-                  {hasGeminiBg ? (
-                    <span className="badge-gemini-bg">
-                      ⚠️ AI BG (REVIEW REQ)
-                    </span>
-                  ) : (
-                    <span className="badge-approved-bg">
-                      ✓ APPROVED BG ({bgFilename})
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Nested 3 Format Render Cards */}
-              <div className="format-grid-3col">
-                {conceptAds.map((ad) => (
-                  <div key={ad.artifact_id} className="format-render-card">
-                    <div>
-                      {/* Format Header */}
-                      <div className="format-card-header">
-                        <span className="format-ratio-tag">
-                          {ad.aspect_ratio === '1:1' ? '1:1 SQUARE' : ad.aspect_ratio === '16:9' ? '16:9 LANDSCAPE' : '9:16 VERTICAL'}
-                        </span>
-                        <span className="format-dims-tag">
-                          {ad.dimensions[0]}×{ad.dimensions[1]}
-                        </span>
-                      </div>
-
-                      {/* Rendered Ad Thumbnail */}
-                      <div
-                        className="format-image-preview-box"
-                        onClick={() => onOpenLightbox(ad)}
-                      >
-                        <img
-                          src={resolveMediaUrl(ad.preview_url)}
-                          alt={ad.filename}
-                          className="format-ad-img"
-                          loading="lazy"
-                        />
-                        <div className="format-hover-overlay">
-                          <span className="format-hover-badge">
-                            🔍 View Large
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Card Actions */}
-                    <div className="format-card-footer">
-                      <span className="format-filesize-text">
-                        {Math.round(ad.filesize_bytes / 1024)} KB
-                      </span>
-                      <a
-                        href={resolveMediaUrl(ad.preview_url)}
-                        download={ad.filename}
-                        className="btn-png-download"
-                      >
-                        <span>📥</span>
-                        <span>PNG</span>
-                      </a>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
+## File: backend/requirements.txt
+````
+fastapi>=0.115.0
+uvicorn>=0.30.0
+pydantic>=2.8.0
+pillow>=10.4.0
+python-dotenv>=1.0.0
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+httpx>=0.27.0
+dropbox>=12.0.0
+google-genai>=1.0.0
+google-cloud-storage>=2.14.0
+firebase-admin>=6.5.0
 ````
 
 ## File: frontend/src/components/CampaignSummary.tsx
@@ -9198,6 +8563,282 @@ export const CampaignSummary: React.FC<CampaignSummaryProps> = ({ brief }) => {
         </>
       )}
     </section>
+  );
+};
+````
+
+## File: frontend/src/components/ContactSheetModal.tsx
+````typescript
+import React from 'react';
+import { resolveMediaUrl } from '../services/api';
+
+interface ContactSheetModalProps {
+  isOpen: boolean;
+  contactSheetUrl: string | null;
+  campaignName: string;
+  runId: string;
+  onClose: () => void;
+}
+
+export const ContactSheetModal: React.FC<ContactSheetModalProps> = ({
+  isOpen,
+  contactSheetUrl,
+  campaignName,
+  runId,
+  onClose,
+}) => {
+  if (!isOpen || !contactSheetUrl) return null;
+
+  const fullContactSheetUrl = resolveMediaUrl(contactSheetUrl);
+
+  return (
+    <div className="modal-overlay-bg" onClick={onClose}>
+      <div
+        className="modal-dialog-box"
+        style={{ maxWidth: '1100px', height: '90vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="modal-header-bar">
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#00D2FF', fontFamily: 'var(--font-mono)', fontWeight: 'bold', letterSpacing: '0.1em' }}>YETI</span>
+              <h2 style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '800' }}>Campaign Contact Sheet</h2>
+            </div>
+            <p style={{ color: '#7E93A7', fontSize: '11px', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
+              {campaignName} | Run: {runId} | Master Multi-Format Overview
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <a
+              href={fullContactSheetUrl}
+              download="yeti_campaign_contact_sheet.jpg"
+              className="btn-zip-download"
+              style={{ padding: '6px 14px', fontSize: '11px' }}
+            >
+              📥 Download JPG
+            </a>
+            <button onClick={onClose} className="modal-close-btn">
+              Close
+            </button>
+          </div>
+        </div>
+
+        {/* High-res Image Scrollable Area */}
+        <div className="modal-content-area" style={{ backgroundColor: '#05090E', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+          <img
+            src={fullContactSheetUrl}
+            alt="YETI Campaign Contact Sheet"
+            style={{ maxWidth: '100%', height: 'auto', borderRadius: '6px', boxShadow: '0 10px 40px rgba(0, 0, 0, 0.8)' }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+````
+
+## File: frontend/src/components/QualityReportModal.tsx
+````typescript
+import React from 'react';
+import { resolveMediaUrl } from '../services/api';
+
+interface QualityReportModalProps {
+  isOpen: boolean;
+  report: any;
+  reportUrl?: string;
+  manifestUrl?: string;
+  logUrl?: string;
+  onClose: () => void;
+}
+
+export const QualityReportModal: React.FC<QualityReportModalProps> = ({
+  isOpen,
+  report,
+  reportUrl,
+  manifestUrl,
+  logUrl,
+  onClose,
+}) => {
+  if (!isOpen || !report) return null;
+
+  const checks = report.checks || [];
+  const audits = report.audience_audits || [];
+  const blockingPassed = report.blocking_checks_passed || 8;
+  const blockingTotal = report.blocking_checks_total || 8;
+
+  return (
+    <div className="modal-overlay-bg" onClick={onClose}>
+      <div
+        className="modal-dialog-box"
+        style={{ maxWidth: '1000px', maxHeight: '90vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="modal-header-bar">
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#00D2FF', fontFamily: 'var(--font-mono)', fontWeight: 'bold', letterSpacing: '0.1em' }}>YETI QA</span>
+              <h2 style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '800' }}>Deterministic Quality & Compliance Report</h2>
+            </div>
+            <p style={{ color: '#7E93A7', fontSize: '11px', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
+              Run: {report.run_id} | Seed: {report.seed} | Status: <span style={{ color: '#31C48D', fontWeight: 'bold', textTransform: 'uppercase' }}>{report.status}</span>
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {manifestUrl && (
+              <a
+                href={resolveMediaUrl(manifestUrl)}
+                download="generation-manifest.json"
+                className="btn-zip-download"
+                style={{ padding: '6px 12px', fontSize: '11px' }}
+              >
+                📋 Manifest JSON
+              </a>
+            )}
+            {reportUrl && (
+              <a
+                href={resolveMediaUrl(reportUrl)}
+                download="generation-report.json"
+                className="btn-contact-sheet-action"
+                style={{ padding: '6px 12px', fontSize: '11px' }}
+              >
+                📥 Report JSON
+              </a>
+            )}
+            {logUrl && (
+              <a
+                href={resolveMediaUrl(logUrl)}
+                download="pipeline.log"
+                className="btn-contact-sheet-action"
+                style={{ padding: '6px 12px', fontSize: '11px' }}
+              >
+                📜 Pipeline Log (JSONL)
+              </a>
+            )}
+            <button onClick={onClose} className="modal-close-btn">
+              Close
+            </button>
+          </div>
+        </div>
+
+
+        {/* Content Area */}
+        <div className="modal-content-area" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Status Banner */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#070E16', border: '1px solid #1A2B3D', borderRadius: '8px', padding: '14px 18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '24px' }}>🛡️</span>
+              <div>
+                <div style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: '14px' }}>
+                  {blockingPassed}/{blockingTotal} Blocking Rules Verified & Passed
+                </div>
+                <div style={{ color: '#7E93A7', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                  Deterministic verification executed across brief, {report.total_concepts || report.audience_audits?.length || 'all'} concept plans, and {report.total_outputs || checks.find((c: any) => c.rule_id === 'BLK-01')?.actual_count || 'all'} rendered ad compositions.
+                </div>
+
+              </div>
+            </div>
+            <span className="badge-count" style={{ fontSize: '12px', padding: '4px 10px' }}>
+              PASSED
+            </span>
+          </div>
+
+          {/* 8 Blocking Checks Grid */}
+          <div>
+            <h3 style={{ color: '#00D2FF', fontSize: '13px', fontFamily: 'var(--font-mono)', fontWeight: 'bold', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
+              Deterministic Blocking Checks
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '10px' }}>
+              {checks.map((chk: any) => (
+                <div
+                  key={chk.check_id}
+                  style={{
+                    backgroundColor: '#09111A',
+                    border: `1px solid ${chk.passed ? '#152535' : '#E02424'}`,
+                    borderRadius: '6px',
+                    padding: '10px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: chk.passed ? '#31C48D' : '#E02424', fontWeight: 'bold' }}>
+                        {chk.passed ? '✓' : '✗'}
+                      </span>
+                      <span style={{ color: '#FFFFFF', fontSize: '12px', fontWeight: 'bold' }}>{chk.check_name}</span>
+                    </div>
+                    <span style={{ color: chk.category === 'blocking' ? '#00D2FF' : '#FDBA74', fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>
+                      {chk.category}
+                    </span>
+                  </div>
+                  <p style={{ color: '#7E93A7', fontSize: '11px', fontFamily: 'var(--font-mono)', margin: 0 }}>
+                    {chk.details}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Per-Audience Audit Table */}
+          {audits.length > 0 && (
+            <div>
+              <h3 style={{ color: '#00D2FF', fontSize: '13px', fontFamily: 'var(--font-mono)', fontWeight: 'bold', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
+                Per-Audience Concept & Quality Audit (6 Audiences)
+              </h3>
+              <div style={{ overflowX: 'auto', border: '1px solid #182635', borderRadius: '8px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', fontFamily: 'var(--font-mono)', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#0A131C', color: '#8EA4B8', borderBottom: '1px solid #182635' }}>
+                      <th style={{ padding: '10px 12px' }}>Audience</th>
+                      <th style={{ padding: '10px 12px' }}>Age</th>
+                      <th style={{ padding: '10px 12px' }}>Activity</th>
+                      <th style={{ padding: '10px 12px' }}>Product</th>
+                      <th style={{ padding: '10px 12px' }}>Tagline</th>
+                      <th style={{ padding: '10px 12px' }}>Contrast</th>
+                      <th style={{ padding: '10px 12px' }}>Busyness</th>
+                      <th style={{ padding: '10px 12px' }}>Provenance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {audits.map((a: any) => (
+                      <tr key={a.audience_id} style={{ borderBottom: '1px solid #101B26', color: '#CAD6E2' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 'bold', color: '#FFFFFF' }}>{a.audience_id} ({a.territory})</td>
+                        <td style={{ padding: '10px 12px' }}>{a.age_band.toUpperCase()}</td>
+                        <td style={{ padding: '10px 12px', textTransform: 'capitalize' }}>{a.activity}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span style={{ color: a.product_role.includes('orange') ? '#FF8A00' : '#E2E8F0' }}>
+                            {a.product_role.includes('orange') ? 'Orange' : 'White'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span style={{ color: a.tagline_color === '#000000' ? '#94A3B8' : '#FFFFFF' }}>
+                            {a.tagline_color === '#000000' ? 'Black' : 'White'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', color: a.contrast_score >= 3.0 ? '#31C48D' : '#FDBA74' }}>
+                          {a.contrast_score}:1
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>{a.busyness_score}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span style={{ color: a.provenance.includes('Gemini') ? '#FDBA74' : '#31C48D' }}>
+                            {a.provenance}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
 ````
@@ -9680,48 +9321,64 @@ export const SAMPLE_BRIEFS: { id: string; filename: string; label: string; brief
 ];
 ````
 
-## File: .env.example
+## File: .gitignore
 ````
-# Server Environment
-PORT=8000
-HOST=0.0.0.0
-CORS_ORIGINS=http://localhost:5173
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
 
-# AI Scene Background Generation (Optional Fallback)
-GEMINI_API_KEY=your_gemini_api_key_here
+# Production / Build
+dist/
+build/
 
-# Local Storage Root (Default fallback when Dropbox token is empty)
-STORAGE_ROOT=./outputs
+# Large Design Files (>100MB GitHub limit)
+YETI_Sample_AD.psd
+*.psd
 
-# ==============================================================================
-# Dropbox Storage Adapter Configuration
-# ==============================================================================
-# Option 1: Quick Testing (Short-lived token ~4 hours)
-DROPBOX_ACCESS_TOKEN=
+# Environment & secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
 
-# Option 2: Permanent Automatic Refresh (Recommended for continuous runs)
-DROPBOX_REFRESH_TOKEN=
-DROPBOX_APP_KEY=
-DROPBOX_APP_SECRET=
+# Python & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+.cache/
+.dropbox_cache/
 
-# Root folder for campaigns (use "/" if your Dropbox App scope is "App folder")
-DROPBOX_CAMPAIGN_ROOT=/yeti-ad-generator
-LOCAL_ASSET_CACHE_DIR=./.cache/dropbox-assets
+# Outputs & temporary generation files
+outputs/*
+!outputs/.gitkeep
+!outputs/test_fixtures/
+!outputs/test_fixtures/*
 
-# ==============================================================================
-# Firebase & Google Cloud Storage Adapter (Optional Cloud Backup)
-# ==============================================================================
-# STORAGE_MODE can be: local, dropbox, or firebase
-STORAGE_MODE=local
-FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
-FIREBASE_CREDENTIALS_JSON=
-FIREBASE_CREDENTIALS_PATH=
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
 
-# Frontend Firebase Client Settings (Optional)
-VITE_FIREBASE_API_KEY=
-VITE_FIREBASE_AUTH_DOMAIN=
-VITE_FIREBASE_PROJECT_ID=
-VITE_FIREBASE_STORAGE_BUCKET=
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local Netlify folder
+.netlify
 ````
 
 ## File: backend/app/services/compositor.py
@@ -11265,6 +10922,354 @@ class ConceptPlanner:
 }
 ````
 
+## File: frontend/src/components/CampaignResultsView.tsx
+````typescript
+import React, { useState, useMemo } from 'react';
+import { type CampaignRunResult, type GeneratedAdArtifact, resolveMediaUrl } from '../services/api';
+
+interface CampaignResultsViewProps {
+  result: CampaignRunResult;
+  onOpenLightbox: (ad: GeneratedAdArtifact) => void;
+  onOpenContactSheet: () => void;
+  onOpenQualityReport?: () => void;
+  onReRun: () => void;
+}
+
+export const CampaignResultsView: React.FC<CampaignResultsViewProps> = ({
+  result,
+  onOpenLightbox,
+  onOpenContactSheet,
+  onOpenQualityReport,
+  onReRun,
+}) => {
+
+  // Filter states
+  const [selectedActivity, setSelectedActivity] = useState<string>('all');
+  const [selectedProductColor, setSelectedProductColor] = useState<string>('all');
+  const [selectedFormat, setSelectedFormat] = useState<string>('all');
+
+  // Filtered concepts and ads
+  const filteredConcepts = useMemo(() => {
+    return result.concepts.filter((concept) => {
+      if (selectedActivity !== 'all' && concept.activity.toLowerCase() !== selectedActivity.toLowerCase()) {
+        return false;
+      }
+      const prodColor = concept.product_role.includes('orange') ? 'orange' : 'white';
+      if (selectedProductColor !== 'all' && prodColor !== selectedProductColor) {
+        return false;
+      }
+      return true;
+    });
+  }, [result.concepts, selectedActivity, selectedProductColor]);
+
+  // Group ads by concept_id
+  const adsByConcept = useMemo(() => {
+    const map: Record<string, GeneratedAdArtifact[]> = {};
+    for (const ad of result.ads) {
+      if (!map[ad.concept_id]) map[ad.concept_id] = [];
+      if (selectedFormat === 'all' || ad.aspect_ratio === selectedFormat) {
+        map[ad.concept_id].push(ad);
+      }
+    }
+    return map;
+  }, [result.ads, selectedFormat]);
+
+  return (
+    <div className="results-container" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* 1. Campaign Run Header Summary Banner */}
+      <div className="results-header-card">
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+          <div>
+            <div className="results-meta-row">
+              <span className="badge-run-id">RUN: {result.run_id}</span>
+              <span className="badge-seed">SEED: {result.seed}</span>
+              <span className="badge-count">{result.total_outputs || result.ads.length} ADS GENERATED</span>
+              <span className="badge-seed">⏱️ {result.duration_seconds}s</span>
+            </div>
+            <h2 className="results-title">{result.campaign_name}</h2>
+            <p className="results-provenance-text">{result.provenance_summary}</p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="results-action-group">
+            {result.zip_bundle_download_url && (
+              <a href={resolveMediaUrl(result.zip_bundle_download_url)} download className="btn-zip-download">
+                <span>📥</span>
+                <span>DOWNLOAD ALL {result.total_outputs || result.ads.length} ADS (ZIP)</span>
+              </a>
+            )}
+
+            {result.contact_sheet_preview_url && (
+              <button onClick={onOpenContactSheet} className="btn-contact-sheet-action">
+                <span>🖼️</span>
+                <span>VIEW CONTACT SHEET</span>
+              </button>
+            )}
+
+            {result.quality_report && (
+              <button
+                onClick={onOpenQualityReport}
+                className="btn-contact-sheet-action"
+                style={{ color: '#31C48D', borderColor: 'rgba(14, 159, 110, 0.4)' }}
+              >
+                <span>🛡️</span>
+                <span>QUALITY REPORT ({result.quality_report.blocking_checks_passed || 8}/8)</span>
+              </button>
+            )}
+
+            <button
+              onClick={onReRun}
+              className="btn-contact-sheet-action"
+              style={{ color: '#00D2FF', borderColor: 'rgba(0, 210, 255, 0.4)' }}
+            >
+              <span>🔄</span>
+              <span>RUN NEW BATCH</span>
+            </button>
+
+          </div>
+        </div>
+
+        {/* Dropbox Storage / Provenance Status Bar */}
+        <div className="results-storage-footer">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: '#00D2FF', fontWeight: 'bold' }}>Storage:</span>
+            <span style={{ color: '#FFFFFF', textTransform: 'capitalize' }}>{result.storage_mode}</span>
+            {result.dropbox_folder_path && (
+              <span style={{ color: '#5E7387' }}>({result.dropbox_folder_path})</span>
+            )}
+          </div>
+
+          {result.dropbox_shared_link ? (
+            <a
+              href={result.dropbox_shared_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="dropbox-link-btn"
+            >
+              <span>🔗</span>
+              <span>Open in Dropbox Folder</span>
+            </a>
+          ) : (
+            <span style={{ color: '#5E7387' }}>Dropbox App Folder Synced</span>
+          )}
+        </div>
+      </div>
+
+      {/* 2. Filter Controls */}
+      <div className="results-filter-bar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ color: '#00D2FF', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            Filter Ads:
+          </span>
+        </div>
+
+        <div className="filter-group-items">
+          {/* Activity Filter */}
+          <div className="filter-select-item">
+            <span>Activity:</span>
+            <select
+              value={selectedActivity}
+              onChange={(e) => setSelectedActivity(e.target.value)}
+              className="filter-dropdown"
+            >
+              <option value="all">All Activities ({result.concepts.length})</option>
+
+              <option value="beach">Beach</option>
+              <option value="camping">Camping</option>
+              <option value="tailgating">Tailgating</option>
+            </select>
+          </div>
+
+          {/* Product Color Filter */}
+          <div className="filter-select-item">
+            <span>Product:</span>
+            <select
+              value={selectedProductColor}
+              onChange={(e) => setSelectedProductColor(e.target.value)}
+              className="filter-dropdown"
+            >
+              <option value="all">All Colors</option>
+              <option value="orange">Orange Cooler (Younger 20–24)</option>
+              <option value="white">White Cooler (Older 25–30)</option>
+            </select>
+          </div>
+
+          {/* Format Filter */}
+          <div className="filter-select-item">
+            <span>Format:</span>
+            <select
+              value={selectedFormat}
+              onChange={(e) => setSelectedFormat(e.target.value)}
+              className="filter-dropdown"
+            >
+              <option value="all">All 3 Formats (1:1, 16:9, 9:16)</option>
+              <option value="1:1">1:1 Square (1080×1080)</option>
+              <option value="16:9">16:9 Landscape (1920×1080)</option>
+              <option value="9:16">9:16 Vertical (1080×1920)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Six Concept Cards (One per Audience) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {filteredConcepts.map((concept) => {
+          const conceptAds = adsByConcept[concept.concept_id] || [];
+          const isOrange = concept.product_role.includes('orange');
+          const isYounger = concept.age_band === 'younger';
+          const bgFilename = concept.selected_background_path.split('/').pop() || '';
+          const hasGeminiBg = result.gemini_audiences.includes(concept.audience_id);
+
+          return (
+            <div key={concept.concept_id} className="concept-card">
+              {/* Concept Metadata Header */}
+              <div className="concept-header-row">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span className="badge-run-id" style={{ fontSize: '13px', padding: '4px 10px' }}>
+                    {concept.audience_id}
+                  </span>
+                  <div>
+                    <h3 className="concept-audience-title">{concept.audience_name}</h3>
+                    <p className="concept-audience-subtitle">
+                      Territory: <span style={{ color: '#E2E8F0' }}>{concept.territory}</span> | Seed: {concept.seed_used}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Concept Badges */}
+                <div className="concept-badge-list">
+                  <span className={isYounger ? 'badge-age-younger' : 'badge-age-older'}>
+                    {isYounger ? 'AGE 20–24 (YOUNGER)' : 'AGE 25–30 (OLDER)'}
+                  </span>
+
+                  <span className={isOrange ? 'badge-product-orange' : 'badge-product-white'}>
+                    {isOrange ? 'ORANGE COOLER' : 'WHITE COOLER'}
+                  </span>
+
+                  <span className="badge-seed" style={{ textTransform: 'uppercase', color: '#00D2FF' }}>
+                    {concept.activity}
+                  </span>
+
+                  <span className="badge-seed">
+                    TAGLINE: {concept.selected_tagline_text} ({concept.tagline_color_hex === '#000000' ? 'BLACK' : 'WHITE'})
+                  </span>
+
+                  {hasGeminiBg ? (
+                    <span className="badge-gemini-bg">
+                      ⚠️ AI BG (REVIEW REQ)
+                    </span>
+                  ) : (
+                    <span className="badge-approved-bg">
+                      ✓ APPROVED BG ({bgFilename})
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Nested 3 Format Render Cards */}
+              <div className="format-grid-3col">
+                {conceptAds.map((ad) => (
+                  <div key={ad.artifact_id} className="format-render-card">
+                    <div>
+                      {/* Format Header */}
+                      <div className="format-card-header">
+                        <span className="format-ratio-tag">
+                          {ad.aspect_ratio === '1:1' ? '1:1 SQUARE' : ad.aspect_ratio === '16:9' ? '16:9 LANDSCAPE' : '9:16 VERTICAL'}
+                        </span>
+                        <span className="format-dims-tag">
+                          {ad.dimensions[0]}×{ad.dimensions[1]}
+                        </span>
+                      </div>
+
+                      {/* Rendered Ad Thumbnail */}
+                      <div
+                        className="format-image-preview-box"
+                        onClick={() => onOpenLightbox(ad)}
+                      >
+                        <img
+                          src={resolveMediaUrl(ad.preview_url)}
+                          alt={ad.filename}
+                          className="format-ad-img"
+                          loading="lazy"
+                        />
+                        <div className="format-hover-overlay">
+                          <span className="format-hover-badge">
+                            🔍 View Large
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Card Actions */}
+                    <div className="format-card-footer">
+                      <span className="format-filesize-text">
+                        {Math.round(ad.filesize_bytes / 1024)} KB
+                      </span>
+                      <a
+                        href={resolveMediaUrl(ad.preview_url)}
+                        download={ad.filename}
+                        className="btn-png-download"
+                      >
+                        <span>📥</span>
+                        <span>PNG</span>
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+````
+
+## File: .env.example
+````
+# Server Environment
+PORT=8000
+HOST=0.0.0.0
+CORS_ORIGINS=http://localhost:5173
+
+# AI Scene Background Generation (Optional Fallback)
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Local Storage Root (Default fallback when Dropbox token is empty)
+STORAGE_ROOT=./outputs
+
+# ==============================================================================
+# Dropbox Storage Adapter Configuration
+# ==============================================================================
+# Option 1: Quick Testing (Short-lived token ~4 hours)
+DROPBOX_ACCESS_TOKEN=
+
+# Option 2: Permanent Automatic Refresh (Recommended for continuous runs)
+DROPBOX_REFRESH_TOKEN=
+DROPBOX_APP_KEY=
+DROPBOX_APP_SECRET=
+
+# Root folder for campaigns (use "/" if your Dropbox App scope is "App folder")
+DROPBOX_CAMPAIGN_ROOT=/yeti-ad-generator
+LOCAL_ASSET_CACHE_DIR=./.cache/dropbox-assets
+
+# ==============================================================================
+# Firebase & Google Cloud Storage Adapter (Optional Cloud Backup)
+# ==============================================================================
+# STORAGE_MODE can be: local, dropbox, or firebase
+STORAGE_MODE=local
+FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
+FIREBASE_CREDENTIALS_JSON=
+FIREBASE_CREDENTIALS_PATH=
+
+# Frontend Firebase Client Settings (Optional)
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+````
+
 ## File: backend/app/models/brief.py
 ````python
 """Pydantic models and strict validation contract for YETI campaign brief."""
@@ -11742,229 +11747,6 @@ describe('YETI Ad Generator UI', () => {
 });
 ````
 
-## File: backend/app/main.py
-````python
-import os
-from dotenv import load_dotenv
-
-# Load environment variables from .env
-load_dotenv(override=True)
-
-from fastapi import FastAPI, Body, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, Any, Optional
-
-from backend.app.models.brief import CampaignBriefModel
-from backend.app.models.assets import AssetReadinessReport
-from backend.app.services.brief_validator import validate_brief_dict
-from backend.app.services.asset_resolver import AssetResolver
-
-
-app = FastAPI(
-    title="YETI Ad Generator API",
-    description="Creative Automation backend for scalable social campaigns.",
-    version="1.0.0",
-)
-
-# CORS middleware for local Vite frontend and Netlify deployments
-cors_origins_env = os.getenv("CORS_ORIGINS", "")
-allowed_origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5174",
-    "https://yeti-ad-generator.netlify.app",
-]
-if cors_origins_env:
-    for o in cors_origins_env.split(","):
-        if o.strip() and o.strip() not in allowed_origins:
-            allowed_origins.append(o.strip())
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-resolver = AssetResolver()
-
-
-@app.get("/api/health")
-def health_check():
-    return {"status": "ok", "app": "YETI Ad Generator", "version": "1.0.0"}
-
-
-@app.get("/api/assets/readiness", response_model=AssetReadinessReport)
-def get_asset_readiness():
-    """Returns a truthful readiness report for all required assets."""
-    report = resolver.generate_readiness_report()
-    return report
-
-
-from backend.app.services.storage import get_storage_adapter, StorageStatus
-
-@app.get("/api/storage/status", response_model=StorageStatus)
-def get_storage_status():
-    """Returns storage status (configured/reachable) without leaking secrets."""
-    adapter = get_storage_adapter()
-    return adapter.get_status()
-
-
-@app.get("/api/integrations/status")
-def get_integrations_status():
-    """Returns live readiness for Storage and Gemini AI scene provider."""
-    storage_adapter = get_storage_adapter()
-    gemini_gen = GeminiBackgroundGenerator()
-    return {
-        "storage": storage_adapter.get_status().model_dump(),
-        "gemini": {
-            "configured": gemini_gen.is_configured(),
-            "model": gemini_gen.model_name,
-            "status": "active" if gemini_gen.is_configured() else "standby",
-        }
-    }
-
-
-
-@app.post("/api/brief/validate")
-def validate_brief_endpoint(brief: Dict[str, Any] = Body(...)):
-    """Validates campaign brief against strict contract."""
-    is_valid, model, errors = validate_brief_dict(brief)
-    return {
-        "isValid": is_valid,
-        "errors": errors,
-        "audienceCount": len(model.audiences) if model else 0,
-        "formatCount": len(model.outputFormats) if model else 0,
-        "totalOutputs": model.generation.totalOutputsPerRun if model else 0,
-    }
-
-
-from backend.app.models.plan import CampaignPlanResult
-from backend.app.services.concept_planner import ConceptPlanner
-
-planner = ConceptPlanner(resolver)
-
-
-@app.post("/api/campaign/plan", response_model=CampaignPlanResult)
-def plan_campaign_endpoint(
-    brief: Dict[str, Any] = Body(...),
-    seed: Optional[int] = None,
-):
-    """Plans 6 immutable audience concepts and 18 deterministic format render plans."""
-    is_valid, model, errors = validate_brief_dict(brief)
-    if not is_valid or model is None:
-        raise HTTPException(
-            status_code=400,
-            detail={"message": "Invalid campaign brief", "errors": errors},
-        )
-
-    try:
-        plan_result = planner.plan_campaign(model, seed=seed)
-        return plan_result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-from backend.app.models.generation import GeneratedBackgroundMetadata, GenerationRequest
-from backend.app.services.gemini_generator import GeminiBackgroundGenerator
-
-generator = GeminiBackgroundGenerator()
-
-
-@app.post("/api/backgrounds/generate", response_model=GeneratedBackgroundMetadata)
-def generate_background_endpoint(req: GenerationRequest = Body(...)):
-    """Generates a missing background using Gemini or deterministic mock provider."""
-    try:
-        bg_meta = generator.generate_background(
-            activity=req.activity,
-            territory=req.territory,
-            custom_prompt_suffix=req.custom_prompt_suffix,
-            force_mock=req.force_mock,
-        )
-        return bg_meta
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-from fastapi.responses import FileResponse
-from backend.app.models.pipeline import CampaignRunResult
-from backend.app.services.pipeline_runner import CampaignPipelineRunner
-
-runner = CampaignPipelineRunner()
-
-
-@app.post("/api/campaign/generate", response_model=CampaignRunResult)
-def generate_campaign_endpoint(
-    brief: Dict[str, Any] = Body(...),
-    seed: Optional[int] = None,
-):
-    """Executes end-to-end 18-ad campaign generation pipeline."""
-    try:
-        run_result = runner.execute_campaign(brief_dict=brief, seed=seed)
-        return run_result
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
-
-
-from pathlib import Path
-from fastapi.responses import FileResponse, Response
-
-# Ensure outputs directory exists
-Path("outputs").mkdir(parents=True, exist_ok=True)
-
-
-@app.get("/api/outputs/{file_path:path}")
-def serve_output_file(file_path: str):
-    """
-    Serves output assets (ads, contact sheets, reports, zip archives) reliably
-    across multi-instance Cloud Run containers with local caching and cloud storage fallback.
-    """
-    clean_path = file_path.lstrip("/")
-    local_target = Path("outputs") / clean_path
-
-    # 1. Serve immediately if found on local disk
-    if local_target.exists() and local_target.is_file():
-        return FileResponse(
-            path=str(local_target),
-            headers={"Cache-Control": "public, max-age=86400"},
-        )
-
-    # 2. Resilient Cloud Storage Fallback (Dropbox / Firebase / GCS)
-    try:
-        storage = get_storage_adapter()
-        status = storage.get_status()
-        if status.configured:
-            # Check storage path: e.g. "campaigns/..." or fallback relative
-            remote_candidates = [
-                f"campaigns/{clean_path}",
-                clean_path,
-            ]
-            for candidate in remote_candidates:
-                try:
-                    if storage.exists(candidate):
-                        local_target.parent.mkdir(parents=True, exist_ok=True)
-                        storage.download(candidate, str(local_target))
-                        return FileResponse(
-                            path=str(local_target),
-                            headers={"Cache-Control": "public, max-age=86400"},
-                        )
-                except Exception:
-                    continue
-    except Exception:
-        pass
-
-    raise HTTPException(status_code=404, detail=f"Output asset '{file_path}' not found.")
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
-````
-
 ## File: yeti_la_random_ad_campaign.json
 ````json
 {
@@ -12398,6 +12180,750 @@ if __name__ == "__main__":
 }
 ````
 
+## File: backend/app/main.py
+````python
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env
+load_dotenv(override=True)
+
+from fastapi import FastAPI, Body, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from typing import Dict, Any, Optional
+
+from backend.app.models.brief import CampaignBriefModel
+from backend.app.models.assets import AssetReadinessReport
+from backend.app.services.brief_validator import validate_brief_dict
+from backend.app.services.asset_resolver import AssetResolver
+
+
+app = FastAPI(
+    title="YETI Ad Generator API",
+    description="Creative Automation backend for scalable social campaigns.",
+    version="1.0.0",
+)
+
+# CORS middleware for local Vite frontend and Netlify deployments
+cors_origins_env = os.getenv("CORS_ORIGINS", "")
+allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "https://yeti-ad-generator.netlify.app",
+]
+if cors_origins_env:
+    for o in cors_origins_env.split(","):
+        if o.strip() and o.strip() not in allowed_origins:
+            allowed_origins.append(o.strip())
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+resolver = AssetResolver()
+
+
+@app.get("/api/health")
+def health_check():
+    return {"status": "ok", "app": "YETI Ad Generator", "version": "1.0.0"}
+
+
+@app.get("/api/assets/readiness", response_model=AssetReadinessReport)
+def get_asset_readiness():
+    """Returns a truthful readiness report for all required assets."""
+    report = resolver.generate_readiness_report()
+    return report
+
+
+from backend.app.services.storage import get_storage_adapter, StorageStatus
+
+@app.get("/api/storage/status", response_model=StorageStatus)
+def get_storage_status():
+    """Returns storage status (configured/reachable) without leaking secrets."""
+    adapter = get_storage_adapter()
+    return adapter.get_status()
+
+
+@app.get("/api/integrations/status")
+def get_integrations_status():
+    """Returns live readiness for Storage and Gemini AI scene provider."""
+    storage_adapter = get_storage_adapter()
+    gemini_gen = GeminiBackgroundGenerator()
+    return {
+        "storage": storage_adapter.get_status().model_dump(),
+        "gemini": {
+            "configured": gemini_gen.is_configured(),
+            "model": gemini_gen.model_name,
+            "status": "active" if gemini_gen.is_configured() else "standby",
+        }
+    }
+
+
+
+@app.post("/api/brief/validate")
+def validate_brief_endpoint(brief: Dict[str, Any] = Body(...)):
+    """Validates campaign brief against strict contract."""
+    is_valid, model, errors = validate_brief_dict(brief)
+    return {
+        "isValid": is_valid,
+        "errors": errors,
+        "audienceCount": len(model.audiences) if model else 0,
+        "formatCount": len(model.outputFormats) if model else 0,
+        "totalOutputs": model.generation.totalOutputsPerRun if model else 0,
+    }
+
+
+from backend.app.models.plan import CampaignPlanResult
+from backend.app.services.concept_planner import ConceptPlanner
+
+planner = ConceptPlanner(resolver)
+
+
+@app.post("/api/campaign/plan", response_model=CampaignPlanResult)
+def plan_campaign_endpoint(
+    brief: Dict[str, Any] = Body(...),
+    seed: Optional[int] = None,
+):
+    """Plans 6 immutable audience concepts and 18 deterministic format render plans."""
+    is_valid, model, errors = validate_brief_dict(brief)
+    if not is_valid or model is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"message": "Invalid campaign brief", "errors": errors},
+        )
+
+    try:
+        plan_result = planner.plan_campaign(model, seed=seed)
+        return plan_result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+from backend.app.models.generation import GeneratedBackgroundMetadata, GenerationRequest
+from backend.app.services.gemini_generator import GeminiBackgroundGenerator
+
+generator = GeminiBackgroundGenerator()
+
+
+@app.post("/api/backgrounds/generate", response_model=GeneratedBackgroundMetadata)
+def generate_background_endpoint(req: GenerationRequest = Body(...)):
+    """Generates a missing background using Gemini or deterministic mock provider."""
+    try:
+        bg_meta = generator.generate_background(
+            activity=req.activity,
+            territory=req.territory,
+            custom_prompt_suffix=req.custom_prompt_suffix,
+            force_mock=req.force_mock,
+        )
+        return bg_meta
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+from fastapi.responses import FileResponse
+from backend.app.models.pipeline import CampaignRunResult
+from backend.app.services.pipeline_runner import CampaignPipelineRunner
+
+runner = CampaignPipelineRunner()
+
+
+# ==============================================================================
+# INTERVIEW TRACE: Entry Point (Web UI / API Request)
+# "Trace one campaign from request to output" -> Stage 0: Ingestion
+# React client sends brief JSON + optional seed -> FastAPI forwards to CampaignPipelineRunner
+# ==============================================================================
+@app.post("/api/campaign/generate", response_model=CampaignRunResult)
+def generate_campaign_endpoint(
+    brief: Dict[str, Any] = Body(...),
+    seed: Optional[int] = None,
+):
+    """
+    Executes end-to-end multi-format campaign generation pipeline.
+    
+    Trace lifecycle:
+      1. Validates brief contract with Pydantic
+      2. Resolves & hashes controlled brand assets
+      3. Checks repeat history (prior manifest)
+      4. Deterministically plans concepts using seed
+      5. Generates missing backgrounds via Gemini AI (or procedural fallback)
+      6. Composites 3 aspect ratios per concept via Pillow (fit_within_region)
+      7. Builds contact sheet & ZIP bundle
+      8. Runs 8 blocking quality checks
+      9. Syncs outputs & manifest to storage
+    """
+    try:
+        run_result = runner.execute_campaign(brief_dict=brief, seed=seed)
+        return run_result
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+
+
+from pathlib import Path
+from fastapi.responses import FileResponse, Response
+
+# Ensure outputs directory exists
+Path("outputs").mkdir(parents=True, exist_ok=True)
+
+
+@app.get("/api/outputs/{file_path:path}")
+def serve_output_file(file_path: str):
+    """
+    Serves output assets (ads, contact sheets, reports, zip archives) reliably
+    across multi-instance Cloud Run containers with local caching and cloud storage fallback.
+    """
+    clean_path = file_path.lstrip("/")
+    local_target = Path("outputs") / clean_path
+
+    # 1. Serve immediately if found on local disk
+    if local_target.exists() and local_target.is_file():
+        return FileResponse(
+            path=str(local_target),
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+
+    # 2. Resilient Cloud Storage Fallback (Dropbox / Firebase / GCS)
+    try:
+        storage = get_storage_adapter()
+        status = storage.get_status()
+        if status.configured:
+            # Check storage path: e.g. "campaigns/..." or fallback relative
+            remote_candidates = [
+                f"campaigns/{clean_path}",
+                clean_path,
+            ]
+            for candidate in remote_candidates:
+                try:
+                    if storage.exists(candidate):
+                        local_target.parent.mkdir(parents=True, exist_ok=True)
+                        storage.download(candidate, str(local_target))
+                        return FileResponse(
+                            path=str(local_target),
+                            headers={"Cache-Control": "public, max-age=86400"},
+                        )
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    raise HTTPException(status_code=404, detail=f"Output asset '{file_path}' not found.")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
+````
+
+## File: backend/app/services/pipeline_runner.py
+````python
+"""Campaign Pipeline Runner - End-to-end orchestration of 18 YETI ads with Quality Checks & Reporting."""
+
+import os
+import json
+import time
+import zipfile
+import concurrent.futures
+from pathlib import Path
+from datetime import datetime, timezone
+from typing import Dict, Any, Optional, Callable, List
+from PIL import Image
+
+
+
+from backend.app.models.brief import CampaignBriefModel
+from backend.app.models.plan import AudienceConcept, FormatRenderPlan
+from backend.app.models.pipeline import GeneratedAdArtifact, PipelineStageEvent, CampaignRunResult
+from backend.app.services.brief_validator import validate_brief_dict
+from backend.app.services.asset_resolver import AssetResolver
+from backend.app.services.concept_planner import ConceptPlanner, make_product_slug, make_audience_slug
+from backend.app.services.gemini_generator import GeminiBackgroundGenerator
+from backend.app.services.compositor import AdCompositor
+from backend.app.services.contact_sheet import generate_campaign_contact_sheet
+from backend.app.services.quality_checker import QualityChecker, redact_secrets
+from backend.app.services.storage import get_storage_adapter, StorageAdapter
+
+
+class CampaignPipelineRunner:
+    """
+    Orchestrates the complete 18-ad campaign pipeline:
+    1. Validating JSON
+    2. Resolving controlled assets
+    3. Reading repeat history
+    4. Selecting six concepts
+    5. Generating missing backgrounds if needed
+    6. Rendering 18 adaptations
+    7. Generating contact sheet & ZIP bundle
+    8. Running deterministic quality checks & audits
+    9. Uploading to Dropbox
+    10. Generating generation-report.json and pipeline.log
+    """
+
+    def __init__(
+        self,
+        asset_resolver: Optional[AssetResolver] = None,
+        storage_adapter: Optional[StorageAdapter] = None,
+        gemini_generator: Optional[GeminiBackgroundGenerator] = None,
+        compositor: Optional[AdCompositor] = None,
+        quality_checker: Optional[QualityChecker] = None,
+        local_base_dir: str = "outputs",
+    ):
+        self.resolver = asset_resolver or AssetResolver()
+        self.storage = storage_adapter
+        self.gemini = gemini_generator or GeminiBackgroundGenerator(storage_adapter=self.storage)
+        self.compositor = compositor or AdCompositor()
+        self.planner = ConceptPlanner(self.resolver)
+        self.checker = quality_checker or QualityChecker()
+        self.base_dir = Path(local_base_dir).resolve()
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+
+    # ==============================================================================
+    # INTERVIEW TRACE: 9-Stage Pipeline Orchestrator
+    # "Trace one campaign from request to output"
+    #
+    # Verbal Explanation:
+    # 1. React UI or CLI sends brief JSON + seed -> Ingestion
+    # 2. Stage 1: Pydantic validates the brief against schema contract (brief_validator.py)
+    # 3. Stage 2: AssetResolver verifies controlled assets (packshots, logos, fonts) exist & match hashes
+    # 4. Stage 3: Reads repeat history (prior manifest) to avoid back-to-back asset repetition
+    # 5. Stage 4: ConceptPlanner deterministically maps age->product color and seed->background pool
+    # 6. Stage 5: Gemini AI synthesizes missing backgrounds with brand guardrails (or mock fallback)
+    # 7. Stage 6: Pillow AdCompositor renders 3 aspect ratios per concept with fit_within_region()
+    # 8. Stage 7: Generates 6x3 master campaign contact sheet
+    # 9. Stage 8: Packages all variations into a ZIP archive
+    # 10. Stage 9: QualityChecker executes 8 blocking QA checks (BLK-01 to BLK-08)
+    # 11. Stage 10: Syncs outputs, execution logs, and manifest to local / cloud storage
+    # ==============================================================================
+    def execute_campaign(
+        self,
+        brief_dict: Dict[str, Any],
+        seed: Optional[int] = None,
+        progress_callback: Optional[Callable[[PipelineStageEvent], None]] = None,
+    ) -> CampaignRunResult:
+        """
+        Executes end-to-end multi-format campaign generation pipeline across 9 deterministic stages.
+        """
+        start_time = time.time()
+        now_str = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        run_id = f"run-{now_str}-{seed if seed is not None else 'auto'}"
+
+        log_entries: List[Dict[str, Any]] = []
+
+        def log_entry(stage: str, level: str, message: str, extra: Optional[Dict[str, Any]] = None):
+            redacted_msg = redact_secrets(message)
+            entry = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "runId": run_id,
+                "stage": stage,
+                "level": level,
+                "message": redacted_msg,
+            }
+            if extra:
+                entry["data"] = {k: redact_secrets(str(v)) if isinstance(v, str) else v for k, v in extra.items()}
+            log_entries.append(entry)
+
+        # Target total ads count (default or from plan)
+        expected_total_ads = len(brief_dict.get("audiences", [])) * len(brief_dict.get("outputFormats", [])) if brief_dict.get("audiences") and brief_dict.get("outputFormats") else 18
+
+        def emit_event(stage: str, pct: int, completed: int, msg: str, total: Optional[int] = None):
+            log_entry(stage, "INFO", msg)
+            if progress_callback:
+                progress_callback(
+                    PipelineStageEvent(
+                        stage=stage,
+                        progress_pct=pct,
+                        completed_items=completed,
+                        total_items=total if total is not None else expected_total_ads,
+                        message=msg,
+                    )
+                )
+
+        # ----------------------------------------------------------------------
+        # Stage 1: Validating JSON Brief Contract (Pydantic)
+        # ----------------------------------------------------------------------
+        emit_event("Validating JSON", 5, 0, "Validating campaign brief contract and rules...")
+        is_valid, brief_model, validation_errors = validate_brief_dict(brief_dict)
+        if not is_valid or not brief_model:
+            log_entry("Validating JSON", "ERROR", f"Brief validation failed: {'; '.join(validation_errors)}")
+            raise ValueError(f"Brief validation failed: {'; '.join(validation_errors)}")
+
+        effective_seed = seed if seed is not None else brief_model.generation.seed
+        if effective_seed is None:
+            effective_seed = int(time.time() * 1000) % 1000000
+
+        # ----------------------------------------------------------------------
+        # Stage 2: Resolving Controlled Assets & Integrity Verification
+        # ----------------------------------------------------------------------
+        emit_event("Resolving controlled assets", 15, 0, "Checking local and remote asset readiness...")
+        readiness = self.resolver.generate_readiness_report(custom_catalog=brief_model.assetCatalog)
+        if not readiness.is_ready_to_generate:
+            log_entry("Resolving controlled assets", "ERROR", f"Missing blocking assets: {readiness.summary_messages}")
+            raise RuntimeError(f"Missing blocking assets: {', '.join(readiness.summary_messages)}")
+
+        # ----------------------------------------------------------------------
+        # Stage 3: Reading Repeat History (Prior Manifest Avoidance)
+        # ----------------------------------------------------------------------
+        emit_event("Reading repeat history", 25, 0, "Checking prior run manifests for repeat avoidance...")
+        prior_manifest = None
+        if brief_model.generation.repeatProtection:
+            pm_path = brief_model.generation.repeatProtection.priorManifestPath
+            if pm_path:
+                storage = self.storage or get_storage_adapter()
+                try:
+                    if storage.exists(pm_path):
+                        prior_manifest = storage.read_json(pm_path)
+                        if prior_manifest:
+                            log_entry("Reading repeat history", "INFO", f"Loaded prior manifest from {pm_path}")
+                except Exception as e:
+                    log_entry("Reading repeat history", "WARNING", f"Could not load prior manifest: {e}")
+
+        # ----------------------------------------------------------------------
+        # Stage 4: Selecting Concepts & Deterministic Planning (Seed)
+        # ----------------------------------------------------------------------
+        total_audiences_count = len(brief_model.audiences)
+        emit_event("Selecting concepts", 35, 0, f"Deterministically generating {total_audiences_count} audience plans with seed {effective_seed}...")
+        plan_result = self.planner.plan_campaign(
+            brief=brief_model,
+            seed=effective_seed,
+            prior_manifest=prior_manifest,
+        )
+
+        total_ads = len(plan_result.render_plans)
+        expected_total_ads = total_ads
+
+        # ----------------------------------------------------------------------
+        # Stage 5: Generating Missing Backgrounds with Gemini AI (or Procedural Fallback)
+        # ----------------------------------------------------------------------
+        emit_event("Generating missing backgrounds if needed", 45, 0, "Checking if AI background fallback is required...", total=total_ads)
+        gemini_used = False
+        gemini_audiences: List[str] = []
+
+        for concept in plan_result.concepts:
+            bg_path = Path(concept.selected_background_path)
+            if not bg_path.exists():
+                emit_event(
+                    "Generating missing backgrounds if needed",
+                    50,
+                    0,
+                    f"Generating missing background for {concept.audience_name} ({concept.activity})...",
+                    total=total_ads,
+                )
+                bg_result = self.gemini.generate_for_audience(
+                    activity=concept.activity,
+                    territory=concept.territory,
+                    audience_id=concept.audience_id,
+                    campaign_id=brief_model.campaign.id,
+                    run_id=run_id,
+                )
+                concept.selected_background_path = bg_result.local_path
+                gemini_used = True
+                gemini_audiences.append(concept.audience_id)
+                log_entry("Generating missing backgrounds", "INFO", f"AI background generated for {concept.audience_id}", {"provenance": bg_result.provenance})
+
+        # Create output directories for this run
+        run_dir = self.base_dir / brief_model.campaign.id / "runs" / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        products_output_dir = run_dir / "products"
+        products_output_dir.mkdir(parents=True, exist_ok=True)
+
+        # ----------------------------------------------------------------------
+        # Stage 6: Pillow Canvas Compositor (fit_within_region across 3 ratios)
+        # ----------------------------------------------------------------------
+        emit_event(f"Rendering {total_ads} adaptations", 55, 0, f"Starting composite rendering for {len(plan_result.concepts)} concepts across {len(brief_model.outputFormats)} formats...", total=total_ads)
+        ads: List[GeneratedAdArtifact] = []
+        render_plans: List[FormatRenderPlan] = []
+        concepts: List[AudienceConcept] = []
+
+        completed_ads = 0
+
+
+        for concept in plan_result.concepts:
+            concepts.append(
+                AudienceConcept(
+                    concept_id=concept.concept_id,
+                    audience_id=concept.audience_id,
+                    audience_name=concept.audience_name,
+                    age_band=concept.age_band,
+                    activity=concept.activity,
+                    territory=concept.territory,
+                    product_model=concept.product_model,
+                    product_slug=concept.product_slug,
+                    audience_slug=concept.audience_slug,
+                    product_role=concept.product_role,
+                    product_asset_path=concept.product_asset_path,
+                    background_pool_id=concept.background_pool_id,
+                    selected_background_path=concept.selected_background_path,
+                    tagline_pool_id=concept.tagline_pool_id,
+                    selected_tagline_text=concept.selected_tagline_text,
+                    selected_tagline_asset_path=concept.selected_tagline_asset_path,
+                    tagline_color_hex=concept.tagline_color_hex,
+                    logo_asset_path=concept.logo_asset_path,
+                    seed_used=concept.seed_used,
+                )
+            )
+
+            product_slug = concept.product_slug or make_product_slug(concept.product_model, "orange" if "orange" in concept.product_role else "white")
+            aud_slug = concept.audience_slug or make_audience_slug(concept.audience_name)
+
+            # Product output folder
+            prod_dir = products_output_dir / product_slug
+            prod_dir.mkdir(parents=True, exist_ok=True)
+
+            for output_fmt in brief_model.outputFormats:
+                ratio = output_fmt.aspectRatio
+                clean_ratio = ratio.replace(":", "x")
+                fmt_folder = prod_dir / clean_ratio
+                fmt_folder.mkdir(parents=True, exist_ok=True)
+
+                out_filename = f"{concept.audience_id}_{aud_slug}_{product_slug}_{clean_ratio}.png"
+                out_path = fmt_folder / out_filename
+
+                # Open PIL images for compositing
+                with Image.open(concept.selected_background_path) as bg_im, \
+                     Image.open(concept.product_asset_path) as prod_im, \
+                     Image.open(concept.logo_asset_path) as logo_im, \
+                     Image.open(concept.selected_tagline_asset_path) as tag_im:
+
+                    rendered_img = self.compositor.compose_ad(
+                        background_img=bg_im,
+                        product_img=prod_im,
+                        tagline_asset_or_text=tag_im,
+                        logo_img=logo_im,
+                        aspect_ratio=ratio,
+                        tagline_color_hex=concept.tagline_color_hex,
+                        logo_asset_path=concept.logo_asset_path,
+                    )
+                    rendered_img.save(out_path, format="PNG", optimize=True)
+
+
+                filesize = out_path.stat().st_size
+                dims = (rendered_img.width, rendered_img.height)
+
+                # Relative path for serving
+                rel_path = str(out_path.relative_to(self.base_dir)).replace("\\", "/")
+                preview_url = f"/api/outputs/{rel_path}"
+                storage_path = f"campaigns/{brief_model.campaign.id}/runs/{run_id}/products/{product_slug}/{clean_ratio}/{out_filename}"
+
+                is_gemini_bg = concept.audience_id in gemini_audiences
+                bg_source = "gemini_generated" if is_gemini_bg else "approved_asset"
+
+                ad_artifact = GeneratedAdArtifact(
+                    artifact_id=f"ad-{concept.concept_id}-{clean_ratio}",
+                    concept_id=concept.concept_id,
+                    audience_id=concept.audience_id,
+                    audience_name=concept.audience_name,
+                    activity=concept.activity,
+                    territory=concept.territory,
+                    age_band=concept.age_band,
+                    product_model=concept.product_model,
+                    product_slug=product_slug,
+                    audience_slug=aud_slug,
+                    product_color="orange" if "orange" in concept.product_role else "white",
+                    aspect_ratio=ratio,
+                    dimensions=dims,
+                    filename=out_filename,
+                    local_path=str(out_path).replace("\\", "/"),
+                    preview_url=preview_url,
+                    storage_path=storage_path,
+                    filesize_bytes=filesize,
+                    background_source=bg_source,
+                    human_review_required=is_gemini_bg,
+                )
+                ads.append(ad_artifact)
+
+                completed_ads += 1
+                progress_pct = 55 + int((completed_ads / total_ads) * 20)
+                emit_event(
+                    f"Rendering {total_ads} adaptations",
+                    progress_pct,
+                    completed_ads,
+                    f"Rendered {concept.audience_id} ({ratio}) - {completed_ads}/{total_ads}",
+                    total=total_ads,
+                )
+
+        render_plans = plan_result.render_plans
+
+        # ----------------------------------------------------------------------
+        # Stage 7: Master Campaign Contact Sheet Assembly
+        # ----------------------------------------------------------------------
+        emit_event("Generating contact sheet", 78, completed_ads, f"Assembling master campaign contact sheet ({len(concepts)}x{len(brief_model.outputFormats)})...", total=total_ads)
+        contact_sheet_local = run_dir / "contact-sheet.jpg"
+        generate_campaign_contact_sheet(
+            campaign_name=brief_model.campaign.name,
+            run_id=run_id,
+            seed=effective_seed,
+            concepts=concepts,
+            ads=ads,
+            output_path=str(contact_sheet_local),
+        )
+        cs_rel_path = str(contact_sheet_local.relative_to(self.base_dir)).replace("\\", "/")
+
+        cs_preview_url = f"/api/outputs/{cs_rel_path}"
+
+        # ----------------------------------------------------------------------
+        # Stage 8: ZIP Package Archiving
+        # ----------------------------------------------------------------------
+        zip_local_path = run_dir / f"{brief_model.campaign.id}_{run_id}_all_{total_ads}_ads.zip"
+        with zipfile.ZipFile(zip_local_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for ad in ads:
+                clean_ratio = ad.aspect_ratio.replace(":", "x")
+                p_slug = ad.product_slug or make_product_slug(ad.product_model, ad.product_color)
+                zf.write(ad.local_path, arcname=f"products/{p_slug}/{clean_ratio}/{ad.filename}")
+            zf.write(str(contact_sheet_local), arcname="contact-sheet.jpg")
+
+        zip_rel_path = str(zip_local_path.relative_to(self.base_dir)).replace("\\", "/")
+        zip_download_url = f"/api/outputs/{zip_rel_path}"
+
+        # ----------------------------------------------------------------------
+        # Stage 9: 8 Blocking Quality Checks (BLK-01 to BLK-08) & Report Generation
+        # ----------------------------------------------------------------------
+        emit_event("Running checks", 85, completed_ads, "Executing blocking rules and quality heuristics...", total=total_ads)
+        storage = get_storage_adapter()
+        storage_status = storage.get_status()
+
+        quality_report = self.checker.run_all_checks(
+            brief=brief_model,
+            concepts=plan_result.concepts,
+            ads=ads,
+            run_id=run_id,
+            seed=effective_seed,
+            storage_mode=storage_status.mode,
+        )
+
+        report_local = run_dir / "generation-report.json"
+        with open(report_local, "w", encoding="utf-8") as f:
+            f.write(quality_report.model_dump_json(indent=2))
+        report_rel_path = str(report_local.relative_to(self.base_dir)).replace("\\", "/")
+        report_url = f"/api/outputs/{report_rel_path}"
+
+        if quality_report.status == "failed":
+            err_summary = "; ".join(quality_report.errors)
+            log_entry("Running checks", "ERROR", f"Quality checks failed: {err_summary}")
+            raise RuntimeError(f"Deterministic Quality Checks Failed: {err_summary}")
+
+        # ----------------------------------------------------------------------
+        # Stage 10: Manifest Generation & Storage Synchronization
+        # ----------------------------------------------------------------------
+        manifest_data = {
+            "campaignId": brief_model.campaign.id,
+            "campaignName": brief_model.campaign.name,
+            "runId": run_id,
+            "seed": effective_seed,
+            "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "totalConcepts": len(concepts),
+            "totalAds": len(ads),
+            "status": quality_report.status,
+            "blockingChecksPassed": f"{quality_report.blocking_checks_passed}/{quality_report.blocking_checks_total}",
+            "concepts": [c.model_dump() for c in concepts],
+            "ads": [a.model_dump() for a in ads],
+            "provenance": {
+                "geminiUsed": gemini_used,
+                "geminiAudiences": gemini_audiences,
+                "summary": quality_report.provenance_summary,
+            },
+        }
+
+        manifest_local = run_dir / "generation-manifest.json"
+        with open(manifest_local, "w", encoding="utf-8") as f:
+            json.dump(manifest_data, f, indent=2)
+        manifest_rel_path = str(manifest_local.relative_to(self.base_dir)).replace("\\", "/")
+        manifest_url = f"/api/outputs/{manifest_rel_path}"
+
+        # Write Secret-safe JSONL pipeline log
+        log_entry("Pipeline Execution", "INFO", f"Completed run {run_id} successfully.")
+        log_local = run_dir / "pipeline.log"
+        with open(log_local, "w", encoding="utf-8") as f:
+            for entry in log_entries:
+                f.write(json.dumps(entry) + "\n")
+        log_rel_path = str(log_local.relative_to(self.base_dir)).replace("\\", "/")
+        log_url = f"/api/outputs/{log_rel_path}"
+
+        # Stage 11: Uploading to Dropbox / Storage
+        emit_event("Uploading to Dropbox", 92, completed_ads, "Uploading ads, contact sheet, report, and logs to storage...", total=total_ads)
+        dropbox_shared_link = None
+        dropbox_folder = f"campaigns/{brief_model.campaign.id}/runs/{run_id}"
+
+        try:
+            # Upload manifest
+            storage.upload_json(
+                manifest_data,
+                f"campaigns/{brief_model.campaign.id}/runs/{run_id}/generation-manifest.json",
+                overwrite=True,
+            )
+            # Update latest active campaign manifest pointer for repeat protection
+            storage.upload_json(
+                manifest_data,
+                f"campaigns/{brief_model.campaign.id}/generation-manifest.json",
+                overwrite=True,
+            )
+
+            # Concurrent upload of ads, contact sheet, report, and pipeline log
+            upload_tasks = [
+                (str(report_local), f"campaigns/{brief_model.campaign.id}/runs/{run_id}/generation-report.json"),
+                (str(log_local), f"campaigns/{brief_model.campaign.id}/runs/{run_id}/pipeline.log"),
+                (str(contact_sheet_local), f"campaigns/{brief_model.campaign.id}/runs/{run_id}/contact-sheet.jpg"),
+            ]
+            for ad in ads:
+                if ad.storage_path:
+                    upload_tasks.append((ad.local_path, ad.storage_path))
+
+            def _upload_file_task(task_tuple):
+                local_src, rem_dest = task_tuple
+                storage.upload(local_src, rem_dest, overwrite=True)
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+                list(executor.map(_upload_file_task, upload_tasks))
+
+            # Retrieve folder web link (dl=0) for viewing backups in Dropbox Web
+            dropbox_shared_link = storage.get_shared_folder_link(dropbox_folder)
+        except Exception as e:
+            plan_result.warnings.append(f"Remote storage upload warning: {str(e)}")
+
+
+        duration = round(time.time() - start_time, 2)
+        emit_event("Complete", 100, completed_ads, f"Successfully generated all {total_ads} ads in {duration}s!", total=total_ads)
+
+
+        return CampaignRunResult(
+            run_id=run_id,
+            campaign_id=brief_model.campaign.id,
+            campaign_name=brief_model.campaign.name,
+            seed=effective_seed,
+            status="success",
+            started_at=now_str,
+            completed_at=datetime.now(timezone.utc).isoformat(),
+            duration_seconds=duration,
+            total_concepts=len(concepts),
+            total_outputs=len(ads),
+            concepts=concepts,
+            render_plans=render_plans,
+            ads=ads,
+            contact_sheet_local_path=str(contact_sheet_local).replace("\\", "/"),
+            contact_sheet_preview_url=cs_preview_url,
+            zip_bundle_local_path=str(zip_local_path).replace("\\", "/"),
+            zip_bundle_download_url=zip_download_url,
+            storage_mode=storage_status.mode,
+            dropbox_folder_path=dropbox_folder,
+            dropbox_shared_link=dropbox_shared_link,
+            quality_report=quality_report.model_dump(),
+            report_download_url=report_url,
+            manifest_download_url=manifest_url,
+            pipeline_log_url=log_url,
+
+            provenance_summary=quality_report.provenance_summary,
+            gemini_used=gemini_used,
+            gemini_audiences=gemini_audiences,
+            warnings=quality_report.warnings,
+            errors=quality_report.errors,
+        )
+````
+
 ## File: frontend/src/services/api.ts
 ````typescript
 import type { BriefValidationResult, CampaignBrief } from '../types/campaign';
@@ -12587,469 +13113,6 @@ export async function generateCampaignAds(
 
   return await res.json();
 }
-````
-
-## File: backend/app/services/pipeline_runner.py
-````python
-"""Campaign Pipeline Runner - End-to-end orchestration of 18 YETI ads with Quality Checks & Reporting."""
-
-import os
-import json
-import time
-import zipfile
-import concurrent.futures
-from pathlib import Path
-from datetime import datetime, timezone
-from typing import Dict, Any, Optional, Callable, List
-from PIL import Image
-
-
-
-from backend.app.models.brief import CampaignBriefModel
-from backend.app.models.plan import AudienceConcept, FormatRenderPlan
-from backend.app.models.pipeline import GeneratedAdArtifact, PipelineStageEvent, CampaignRunResult
-from backend.app.services.brief_validator import validate_brief_dict
-from backend.app.services.asset_resolver import AssetResolver
-from backend.app.services.concept_planner import ConceptPlanner, make_product_slug, make_audience_slug
-from backend.app.services.gemini_generator import GeminiBackgroundGenerator
-from backend.app.services.compositor import AdCompositor
-from backend.app.services.contact_sheet import generate_campaign_contact_sheet
-from backend.app.services.quality_checker import QualityChecker, redact_secrets
-from backend.app.services.storage import get_storage_adapter, StorageAdapter
-
-
-class CampaignPipelineRunner:
-    """
-    Orchestrates the complete 18-ad campaign pipeline:
-    1. Validating JSON
-    2. Resolving controlled assets
-    3. Reading repeat history
-    4. Selecting six concepts
-    5. Generating missing backgrounds if needed
-    6. Rendering 18 adaptations
-    7. Generating contact sheet & ZIP bundle
-    8. Running deterministic quality checks & audits
-    9. Uploading to Dropbox
-    10. Generating generation-report.json and pipeline.log
-    """
-
-    def __init__(
-        self,
-        asset_resolver: Optional[AssetResolver] = None,
-        storage_adapter: Optional[StorageAdapter] = None,
-        gemini_generator: Optional[GeminiBackgroundGenerator] = None,
-        compositor: Optional[AdCompositor] = None,
-        quality_checker: Optional[QualityChecker] = None,
-        local_base_dir: str = "outputs",
-    ):
-        self.resolver = asset_resolver or AssetResolver()
-        self.storage = storage_adapter
-        self.gemini = gemini_generator or GeminiBackgroundGenerator(storage_adapter=self.storage)
-        self.compositor = compositor or AdCompositor()
-        self.planner = ConceptPlanner(self.resolver)
-        self.checker = quality_checker or QualityChecker()
-        self.base_dir = Path(local_base_dir).resolve()
-        self.base_dir.mkdir(parents=True, exist_ok=True)
-
-    def execute_campaign(
-        self,
-        brief_dict: Dict[str, Any],
-        seed: Optional[int] = None,
-        progress_callback: Optional[Callable[[PipelineStageEvent], None]] = None,
-    ) -> CampaignRunResult:
-        start_time = time.time()
-        now_str = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        run_id = f"run-{now_str}-{seed if seed is not None else 'auto'}"
-
-        log_entries: List[Dict[str, Any]] = []
-
-        def log_entry(stage: str, level: str, message: str, extra: Optional[Dict[str, Any]] = None):
-            redacted_msg = redact_secrets(message)
-            entry = {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "runId": run_id,
-                "stage": stage,
-                "level": level,
-                "message": redacted_msg,
-            }
-            if extra:
-                entry["data"] = {k: redact_secrets(str(v)) if isinstance(v, str) else v for k, v in extra.items()}
-            log_entries.append(entry)
-
-        # Target total ads count (default or from plan)
-        expected_total_ads = len(brief_dict.get("audiences", [])) * len(brief_dict.get("outputFormats", [])) if brief_dict.get("audiences") and brief_dict.get("outputFormats") else 18
-
-        def emit_event(stage: str, pct: int, completed: int, msg: str, total: Optional[int] = None):
-            log_entry(stage, "INFO", msg)
-            if progress_callback:
-                progress_callback(
-                    PipelineStageEvent(
-                        stage=stage,
-                        progress_pct=pct,
-                        completed_items=completed,
-                        total_items=total if total is not None else expected_total_ads,
-                        message=msg,
-                    )
-                )
-
-        # Stage 1: Validating JSON
-        emit_event("Validating JSON", 5, 0, "Validating campaign brief contract and rules...")
-        is_valid, brief_model, validation_errors = validate_brief_dict(brief_dict)
-        if not is_valid or not brief_model:
-            log_entry("Validating JSON", "ERROR", f"Brief validation failed: {'; '.join(validation_errors)}")
-            raise ValueError(f"Brief validation failed: {'; '.join(validation_errors)}")
-
-        effective_seed = seed if seed is not None else brief_model.generation.seed
-        if effective_seed is None:
-            effective_seed = int(time.time() * 1000) % 1000000
-
-        # Stage 2: Resolving controlled assets
-        emit_event("Resolving controlled assets", 15, 0, "Checking local and remote asset readiness...")
-        readiness = self.resolver.generate_readiness_report(custom_catalog=brief_model.assetCatalog)
-        if not readiness.is_ready_to_generate:
-            log_entry("Resolving controlled assets", "ERROR", f"Missing blocking assets: {readiness.summary_messages}")
-            raise RuntimeError(f"Missing blocking assets: {', '.join(readiness.summary_messages)}")
-
-        # Stage 3: Reading repeat history
-        emit_event("Reading repeat history", 25, 0, "Checking prior run manifests for repeat avoidance...")
-        prior_manifest = None
-        if brief_model.generation.repeatProtection:
-            pm_path = brief_model.generation.repeatProtection.priorManifestPath
-            if pm_path:
-                storage = self.storage or get_storage_adapter()
-                try:
-                    if storage.exists(pm_path):
-                        prior_manifest = storage.read_json(pm_path)
-                        if prior_manifest:
-                            log_entry("Reading repeat history", "INFO", f"Loaded prior manifest from {pm_path}")
-                except Exception as e:
-                    log_entry("Reading repeat history", "WARNING", f"Could not load prior manifest: {e}")
-
-        # Stage 4: Selecting concepts
-        total_audiences_count = len(brief_model.audiences)
-        emit_event("Selecting concepts", 35, 0, f"Deterministically generating {total_audiences_count} audience plans with seed {effective_seed}...")
-        plan_result = self.planner.plan_campaign(
-            brief=brief_model,
-            seed=effective_seed,
-            prior_manifest=prior_manifest,
-        )
-
-        total_ads = len(plan_result.render_plans)
-        expected_total_ads = total_ads
-
-        # Stage 5: Generating missing backgrounds if needed
-        emit_event("Generating missing backgrounds if needed", 45, 0, "Checking if AI background fallback is required...", total=total_ads)
-        gemini_used = False
-        gemini_audiences: List[str] = []
-
-        for concept in plan_result.concepts:
-            bg_path = Path(concept.selected_background_path)
-            if not bg_path.exists():
-                emit_event(
-                    "Generating missing backgrounds if needed",
-                    50,
-                    0,
-                    f"Generating missing background for {concept.audience_name} ({concept.activity})...",
-                    total=total_ads,
-                )
-                bg_result = self.gemini.generate_for_audience(
-                    activity=concept.activity,
-                    territory=concept.territory,
-                    audience_id=concept.audience_id,
-                    campaign_id=brief_model.campaign.id,
-                    run_id=run_id,
-                )
-                concept.selected_background_path = bg_result.local_path
-                gemini_used = True
-                gemini_audiences.append(concept.audience_id)
-                log_entry("Generating missing backgrounds", "INFO", f"AI background generated for {concept.audience_id}", {"provenance": bg_result.provenance})
-
-        # Create output directories for this run
-        run_dir = self.base_dir / brief_model.campaign.id / "runs" / run_id
-        run_dir.mkdir(parents=True, exist_ok=True)
-        products_output_dir = run_dir / "products"
-        products_output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Stage 6: Rendering adaptations
-        emit_event(f"Rendering {total_ads} adaptations", 55, 0, f"Starting composite rendering for {len(plan_result.concepts)} concepts across {len(brief_model.outputFormats)} formats...", total=total_ads)
-        ads: List[GeneratedAdArtifact] = []
-        render_plans: List[FormatRenderPlan] = []
-        concepts: List[AudienceConcept] = []
-
-        completed_ads = 0
-
-
-        for concept in plan_result.concepts:
-            concepts.append(
-                AudienceConcept(
-                    concept_id=concept.concept_id,
-                    audience_id=concept.audience_id,
-                    audience_name=concept.audience_name,
-                    age_band=concept.age_band,
-                    activity=concept.activity,
-                    territory=concept.territory,
-                    product_model=concept.product_model,
-                    product_slug=concept.product_slug,
-                    audience_slug=concept.audience_slug,
-                    product_role=concept.product_role,
-                    product_asset_path=concept.product_asset_path,
-                    background_pool_id=concept.background_pool_id,
-                    selected_background_path=concept.selected_background_path,
-                    tagline_pool_id=concept.tagline_pool_id,
-                    selected_tagline_text=concept.selected_tagline_text,
-                    selected_tagline_asset_path=concept.selected_tagline_asset_path,
-                    tagline_color_hex=concept.tagline_color_hex,
-                    logo_asset_path=concept.logo_asset_path,
-                    seed_used=concept.seed_used,
-                )
-            )
-
-            product_slug = concept.product_slug or make_product_slug(concept.product_model, "orange" if "orange" in concept.product_role else "white")
-            aud_slug = concept.audience_slug or make_audience_slug(concept.audience_name)
-
-            # Product output folder
-            prod_dir = products_output_dir / product_slug
-            prod_dir.mkdir(parents=True, exist_ok=True)
-
-            for output_fmt in brief_model.outputFormats:
-                ratio = output_fmt.aspectRatio
-                clean_ratio = ratio.replace(":", "x")
-                fmt_folder = prod_dir / clean_ratio
-                fmt_folder.mkdir(parents=True, exist_ok=True)
-
-                out_filename = f"{concept.audience_id}_{aud_slug}_{product_slug}_{clean_ratio}.png"
-                out_path = fmt_folder / out_filename
-
-                # Open PIL images for compositing
-                with Image.open(concept.selected_background_path) as bg_im, \
-                     Image.open(concept.product_asset_path) as prod_im, \
-                     Image.open(concept.logo_asset_path) as logo_im, \
-                     Image.open(concept.selected_tagline_asset_path) as tag_im:
-
-                    rendered_img = self.compositor.compose_ad(
-                        background_img=bg_im,
-                        product_img=prod_im,
-                        tagline_asset_or_text=tag_im,
-                        logo_img=logo_im,
-                        aspect_ratio=ratio,
-                        tagline_color_hex=concept.tagline_color_hex,
-                        logo_asset_path=concept.logo_asset_path,
-                    )
-                    rendered_img.save(out_path, format="PNG", optimize=True)
-
-
-                filesize = out_path.stat().st_size
-                dims = (rendered_img.width, rendered_img.height)
-
-                # Relative path for serving
-                rel_path = str(out_path.relative_to(self.base_dir)).replace("\\", "/")
-                preview_url = f"/api/outputs/{rel_path}"
-                storage_path = f"campaigns/{brief_model.campaign.id}/runs/{run_id}/products/{product_slug}/{clean_ratio}/{out_filename}"
-
-                is_gemini_bg = concept.audience_id in gemini_audiences
-                bg_source = "gemini_generated" if is_gemini_bg else "approved_asset"
-
-                ad_artifact = GeneratedAdArtifact(
-                    artifact_id=f"ad-{concept.concept_id}-{clean_ratio}",
-                    concept_id=concept.concept_id,
-                    audience_id=concept.audience_id,
-                    audience_name=concept.audience_name,
-                    activity=concept.activity,
-                    territory=concept.territory,
-                    age_band=concept.age_band,
-                    product_model=concept.product_model,
-                    product_slug=product_slug,
-                    audience_slug=aud_slug,
-                    product_color="orange" if "orange" in concept.product_role else "white",
-                    aspect_ratio=ratio,
-                    dimensions=dims,
-                    filename=out_filename,
-                    local_path=str(out_path).replace("\\", "/"),
-                    preview_url=preview_url,
-                    storage_path=storage_path,
-                    filesize_bytes=filesize,
-                    background_source=bg_source,
-                    human_review_required=is_gemini_bg,
-                )
-                ads.append(ad_artifact)
-
-                completed_ads += 1
-                progress_pct = 55 + int((completed_ads / total_ads) * 20)
-                emit_event(
-                    f"Rendering {total_ads} adaptations",
-                    progress_pct,
-                    completed_ads,
-                    f"Rendered {concept.audience_id} ({ratio}) - {completed_ads}/{total_ads}",
-                    total=total_ads,
-                )
-
-        render_plans = plan_result.render_plans
-
-        # Stage 7: Contact Sheet Generation
-        emit_event("Generating contact sheet", 78, completed_ads, f"Assembling master campaign contact sheet ({len(concepts)}x{len(brief_model.outputFormats)})...", total=total_ads)
-        contact_sheet_local = run_dir / "contact-sheet.jpg"
-        generate_campaign_contact_sheet(
-            campaign_name=brief_model.campaign.name,
-            run_id=run_id,
-            seed=effective_seed,
-            concepts=concepts,
-            ads=ads,
-            output_path=str(contact_sheet_local),
-        )
-        cs_rel_path = str(contact_sheet_local.relative_to(self.base_dir)).replace("\\", "/")
-
-        cs_preview_url = f"/api/outputs/{cs_rel_path}"
-
-        # Stage 8: Generate ZIP Bundle
-        zip_local_path = run_dir / f"{brief_model.campaign.id}_{run_id}_all_{total_ads}_ads.zip"
-        with zipfile.ZipFile(zip_local_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for ad in ads:
-                clean_ratio = ad.aspect_ratio.replace(":", "x")
-                p_slug = ad.product_slug or make_product_slug(ad.product_model, ad.product_color)
-                zf.write(ad.local_path, arcname=f"products/{p_slug}/{clean_ratio}/{ad.filename}")
-            zf.write(str(contact_sheet_local), arcname="contact-sheet.jpg")
-
-        zip_rel_path = str(zip_local_path.relative_to(self.base_dir)).replace("\\", "/")
-        zip_download_url = f"/api/outputs/{zip_rel_path}"
-
-        # Stage 9: Running deterministic checks & Quality Report
-        emit_event("Running checks", 85, completed_ads, "Executing blocking rules and quality heuristics...", total=total_ads)
-        storage = get_storage_adapter()
-        storage_status = storage.get_status()
-
-        quality_report = self.checker.run_all_checks(
-            brief=brief_model,
-            concepts=plan_result.concepts,
-            ads=ads,
-            run_id=run_id,
-            seed=effective_seed,
-            storage_mode=storage_status.mode,
-        )
-
-        report_local = run_dir / "generation-report.json"
-        with open(report_local, "w", encoding="utf-8") as f:
-            f.write(quality_report.model_dump_json(indent=2))
-        report_rel_path = str(report_local.relative_to(self.base_dir)).replace("\\", "/")
-        report_url = f"/api/outputs/{report_rel_path}"
-
-        if quality_report.status == "failed":
-            err_summary = "; ".join(quality_report.errors)
-            log_entry("Running checks", "ERROR", f"Quality checks failed: {err_summary}")
-            raise RuntimeError(f"Deterministic Quality Checks Failed: {err_summary}")
-
-        # Stage 10: Generate Manifest & Secret-safe Pipeline Log
-        manifest_data = {
-            "campaignId": brief_model.campaign.id,
-            "campaignName": brief_model.campaign.name,
-            "runId": run_id,
-            "seed": effective_seed,
-            "generatedAt": datetime.now(timezone.utc).isoformat(),
-            "totalConcepts": len(concepts),
-            "totalAds": len(ads),
-            "status": quality_report.status,
-            "blockingChecksPassed": f"{quality_report.blocking_checks_passed}/{quality_report.blocking_checks_total}",
-            "concepts": [c.model_dump() for c in concepts],
-            "ads": [a.model_dump() for a in ads],
-            "provenance": {
-                "geminiUsed": gemini_used,
-                "geminiAudiences": gemini_audiences,
-                "summary": quality_report.provenance_summary,
-            },
-        }
-
-        manifest_local = run_dir / "generation-manifest.json"
-        with open(manifest_local, "w", encoding="utf-8") as f:
-            json.dump(manifest_data, f, indent=2)
-        manifest_rel_path = str(manifest_local.relative_to(self.base_dir)).replace("\\", "/")
-        manifest_url = f"/api/outputs/{manifest_rel_path}"
-
-        # Write Secret-safe JSONL pipeline log
-        log_entry("Pipeline Execution", "INFO", f"Completed run {run_id} successfully.")
-        log_local = run_dir / "pipeline.log"
-        with open(log_local, "w", encoding="utf-8") as f:
-            for entry in log_entries:
-                f.write(json.dumps(entry) + "\n")
-        log_rel_path = str(log_local.relative_to(self.base_dir)).replace("\\", "/")
-        log_url = f"/api/outputs/{log_rel_path}"
-
-        # Stage 11: Uploading to Dropbox / Storage
-        emit_event("Uploading to Dropbox", 92, completed_ads, "Uploading ads, contact sheet, report, and logs to storage...", total=total_ads)
-        dropbox_shared_link = None
-        dropbox_folder = f"campaigns/{brief_model.campaign.id}/runs/{run_id}"
-
-        try:
-            # Upload manifest
-            storage.upload_json(
-                manifest_data,
-                f"campaigns/{brief_model.campaign.id}/runs/{run_id}/generation-manifest.json",
-                overwrite=True,
-            )
-            # Update latest active campaign manifest pointer for repeat protection
-            storage.upload_json(
-                manifest_data,
-                f"campaigns/{brief_model.campaign.id}/generation-manifest.json",
-                overwrite=True,
-            )
-
-            # Concurrent upload of ads, contact sheet, report, and pipeline log
-            upload_tasks = [
-                (str(report_local), f"campaigns/{brief_model.campaign.id}/runs/{run_id}/generation-report.json"),
-                (str(log_local), f"campaigns/{brief_model.campaign.id}/runs/{run_id}/pipeline.log"),
-                (str(contact_sheet_local), f"campaigns/{brief_model.campaign.id}/runs/{run_id}/contact-sheet.jpg"),
-            ]
-            for ad in ads:
-                if ad.storage_path:
-                    upload_tasks.append((ad.local_path, ad.storage_path))
-
-            def _upload_file_task(task_tuple):
-                local_src, rem_dest = task_tuple
-                storage.upload(local_src, rem_dest, overwrite=True)
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
-                list(executor.map(_upload_file_task, upload_tasks))
-
-            # Retrieve folder web link (dl=0) for viewing backups in Dropbox Web
-            dropbox_shared_link = storage.get_shared_folder_link(dropbox_folder)
-        except Exception as e:
-            plan_result.warnings.append(f"Remote storage upload warning: {str(e)}")
-
-
-        duration = round(time.time() - start_time, 2)
-        emit_event("Complete", 100, completed_ads, f"Successfully generated all {total_ads} ads in {duration}s!", total=total_ads)
-
-
-        return CampaignRunResult(
-            run_id=run_id,
-            campaign_id=brief_model.campaign.id,
-            campaign_name=brief_model.campaign.name,
-            seed=effective_seed,
-            status="success",
-            started_at=now_str,
-            completed_at=datetime.now(timezone.utc).isoformat(),
-            duration_seconds=duration,
-            total_concepts=len(concepts),
-            total_outputs=len(ads),
-            concepts=concepts,
-            render_plans=render_plans,
-            ads=ads,
-            contact_sheet_local_path=str(contact_sheet_local).replace("\\", "/"),
-            contact_sheet_preview_url=cs_preview_url,
-            zip_bundle_local_path=str(zip_local_path).replace("\\", "/"),
-            zip_bundle_download_url=zip_download_url,
-            storage_mode=storage_status.mode,
-            dropbox_folder_path=dropbox_folder,
-            dropbox_shared_link=dropbox_shared_link,
-            quality_report=quality_report.model_dump(),
-            report_download_url=report_url,
-            manifest_download_url=manifest_url,
-            pipeline_log_url=log_url,
-
-            provenance_summary=quality_report.provenance_summary,
-            gemini_used=gemini_used,
-            gemini_audiences=gemini_audiences,
-            warnings=quality_report.warnings,
-            errors=quality_report.errors,
-        )
 ````
 
 ## File: frontend/src/App.tsx

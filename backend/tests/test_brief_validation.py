@@ -62,7 +62,7 @@ def test_rejects_wrong_activity_to_background_pool(valid_brief_data):
 
     is_valid, model, errors = validate_brief_dict(data)
     assert is_valid is False
-    assert any("must resolve strictly to 'beach-west-coast'" in err for err in errors)
+    assert any("does not match background pool activity" in err for err in errors)
 
 
 def test_rejects_camping_with_black_tagline(valid_brief_data):
@@ -167,3 +167,17 @@ def test_rejects_obsolete_black_tagline_layer(valid_brief_data):
     is_valid, model, errors = validate_brief_dict(data)
     assert is_valid is False
     assert any("blackTagline" in err for err in errors)
+
+
+def test_custom_territory_pool_is_valid_and_mismatch_is_rejected(valid_brief_data):
+    data = copy.deepcopy(valid_brief_data)
+    pool = next(p for p in data["backgroundPools"] if p["activity"] == "beach")
+    pool.update(id="beach-miami", territory="Miami", assets=[])
+    for aud in data["audiences"]:
+        if aud["activity"] == "beach":
+            aud.update(backgroundPoolId="beach-miami", territory="Miami")
+    assert validate_brief_dict(data)[0]
+    pool["territory"] = "Los Angeles"
+    valid, _, errors = validate_brief_dict(data)
+    assert not valid
+    assert any("territory does not match" in err for err in errors)

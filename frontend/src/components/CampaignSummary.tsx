@@ -10,7 +10,8 @@ export const CampaignSummary: React.FC<CampaignSummaryProps> = ({ brief }) => {
   const audiences = brief.audiences || [];
   const formats = brief.outputFormats || [];
   const conceptsPerAudience = brief.generation?.conceptsPerAudience || 1;
-  const totalOutputs = brief.generation?.totalOutputsPerRun || (audiences.length * formats.length * conceptsPerAudience);
+  const exactCount = brief.generation?.exactOutputCount;
+  const totalOutputs = exactCount || brief.generation?.totalOutputsPerRun || (audiences.length * formats.length * conceptsPerAudience);
 
   return (
     <section className="campaign-summary-section" aria-labelledby="summary-heading">
@@ -48,19 +49,19 @@ export const CampaignSummary: React.FC<CampaignSummaryProps> = ({ brief }) => {
         <div className="summary-formula-box">
           <div className="summary-formula-main">
             <span className="formula-part highlight">{audiences.length} audiences</span>
-            {conceptsPerAudience > 1 && (
+            {!exactCount && conceptsPerAudience > 1 && (
               <>
                 <span className="formula-operator">×</span>
                 <span className="formula-part highlight">{conceptsPerAudience} concepts</span>
               </>
             )}
-            <span className="formula-operator">×</span>
+            <span className="formula-operator">{exactCount ? '·' : '×'}</span>
             <span className="formula-part highlight">{formats.length} formats</span>
-            <span className="formula-operator">=</span>
+            <span className="formula-operator">{exactCount ? '→' : '='}</span>
             <span className="formula-total">{totalOutputs} Target Ads</span>
           </div>
           <div className="summary-formula-note">
-            Configured Campaign Matrix • {conceptsPerAudience} concept{conceptsPerAudience > 1 ? 's' : ''} per audience mapped across all {formats.length} aspect ratios
+            {exactCount ? 'Exact count distributed across audiences and formats. Final concepts may use fewer formats.' : `Configured Campaign Matrix • ${conceptsPerAudience} concept${conceptsPerAudience > 1 ? 's' : ''} per audience mapped across all ${formats.length} aspect ratios`}
           </div>
         </div>
 
@@ -133,4 +134,3 @@ export const CampaignSummary: React.FC<CampaignSummaryProps> = ({ brief }) => {
     </section>
   );
 };
-

@@ -58,12 +58,32 @@ class CampaignPipelineRunner:
         self.base_dir = Path(local_base_dir).resolve()
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
+    # ==============================================================================
+    # INTERVIEW TRACE: 9-Stage Pipeline Orchestrator
+    # "Trace one campaign from request to output"
+    #
+    # Verbal Explanation:
+    # 1. React UI or CLI sends brief JSON + seed -> Ingestion
+    # 2. Stage 1: Pydantic validates the brief against schema contract (brief_validator.py)
+    # 3. Stage 2: AssetResolver verifies controlled assets (packshots, logos, fonts) exist & match hashes
+    # 4. Stage 3: Reads repeat history (prior manifest) to avoid back-to-back asset repetition
+    # 5. Stage 4: ConceptPlanner deterministically maps age->product color and seed->background pool
+    # 6. Stage 5: Gemini AI synthesizes missing backgrounds with brand guardrails (or mock fallback)
+    # 7. Stage 6: Pillow AdCompositor renders 3 aspect ratios per concept with fit_within_region()
+    # 8. Stage 7: Generates 6x3 master campaign contact sheet
+    # 9. Stage 8: Packages all variations into a ZIP archive
+    # 10. Stage 9: QualityChecker executes 8 blocking QA checks (BLK-01 to BLK-08)
+    # 11. Stage 10: Syncs outputs, execution logs, and manifest to local / cloud storage
+    # ==============================================================================
     def execute_campaign(
         self,
         brief_dict: Dict[str, Any],
         seed: Optional[int] = None,
         progress_callback: Optional[Callable[[PipelineStageEvent], None]] = None,
     ) -> CampaignRunResult:
+        """
+        Executes end-to-end multi-format campaign generation pipeline across 9 deterministic stages.
+        """
         start_time = time.time()
         now_str = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         run_id = f"run-{now_str}-{seed if seed is not None else 'auto'}"
@@ -99,7 +119,9 @@ class CampaignPipelineRunner:
                     )
                 )
 
-        # Stage 1: Validating JSON
+        # ----------------------------------------------------------------------
+        # Stage 1: Validating JSON Brief Contract (Pydantic)
+        # ----------------------------------------------------------------------
         emit_event("Validating JSON", 5, 0, "Validating campaign brief contract and rules...")
         is_valid, brief_model, validation_errors = validate_brief_dict(brief_dict)
         if not is_valid or not brief_model:
@@ -110,14 +132,18 @@ class CampaignPipelineRunner:
         if effective_seed is None:
             effective_seed = int(time.time() * 1000) % 1000000
 
-        # Stage 2: Resolving controlled assets
+        # ----------------------------------------------------------------------
+        # Stage 2: Resolving Controlled Assets & Integrity Verification
+        # ----------------------------------------------------------------------
         emit_event("Resolving controlled assets", 15, 0, "Checking local and remote asset readiness...")
         readiness = self.resolver.generate_readiness_report(custom_catalog=brief_model.assetCatalog)
         if not readiness.is_ready_to_generate:
             log_entry("Resolving controlled assets", "ERROR", f"Missing blocking assets: {readiness.summary_messages}")
             raise RuntimeError(f"Missing blocking assets: {', '.join(readiness.summary_messages)}")
 
-        # Stage 3: Reading repeat history
+        # ----------------------------------------------------------------------
+        # Stage 3: Reading Repeat History (Prior Manifest Avoidance)
+        # ----------------------------------------------------------------------
         emit_event("Reading repeat history", 25, 0, "Checking prior run manifests for repeat avoidance...")
         prior_manifest = None
         if brief_model.generation.repeatProtection:
@@ -132,7 +158,9 @@ class CampaignPipelineRunner:
                 except Exception as e:
                     log_entry("Reading repeat history", "WARNING", f"Could not load prior manifest: {e}")
 
-        # Stage 4: Selecting concepts
+        # ----------------------------------------------------------------------
+        # Stage 4: Selecting Concepts & Deterministic Planning (Seed)
+        # ----------------------------------------------------------------------
         total_audiences_count = len(brief_model.audiences)
         emit_event("Selecting concepts", 35, 0, f"Deterministically generating {total_audiences_count} audience plans with seed {effective_seed}...")
         plan_result = self.planner.plan_campaign(
@@ -144,14 +172,17 @@ class CampaignPipelineRunner:
         total_ads = len(plan_result.render_plans)
         expected_total_ads = total_ads
 
-        # Stage 5: Generating missing backgrounds if needed
+        # ----------------------------------------------------------------------
+        # Stage 5: Generating Missing Backgrounds with Gemini AI (or Procedural Fallback)
+        # ----------------------------------------------------------------------
         emit_event("Generating missing backgrounds if needed", 45, 0, "Checking if AI background fallback is required...", total=total_ads)
         gemini_used = False
         gemini_audiences: List[str] = []
 
         for concept in plan_result.concepts:
             bg_path = Path(concept.selected_background_path)
-            if not bg_path.exists():
+            background_pool = next(pool for pool in brief_model.backgroundPools if pool.id == concept.background_pool_id)
+            if not background_pool.assets or not bg_path.exists():
                 emit_event(
                     "Generating missing backgrounds if needed",
                     50,
@@ -165,7 +196,13 @@ class CampaignPipelineRunner:
                     audience_id=concept.audience_id,
                     campaign_id=brief_model.campaign.id,
                     run_id=run_id,
+                    custom_prompt_suffix=background_pool.visualDirection,
                 )
+                if bg_result.is_mock or not bg_result.ai_generated_background:
+                    raise RuntimeError(
+                        f"Could not generate a background for {concept.territory}. "
+                        "Check Gemini image-generation access and retry; a procedural placeholder cannot represent this location."
+                    )
                 concept.selected_background_path = bg_result.local_path
                 gemini_used = True
                 gemini_audiences.append(concept.audience_id)
@@ -177,7 +214,9 @@ class CampaignPipelineRunner:
         products_output_dir = run_dir / "products"
         products_output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Stage 6: Rendering adaptations
+        # ----------------------------------------------------------------------
+        # Stage 6: Pillow Canvas Compositor (fit_within_region across 3 ratios)
+        # ----------------------------------------------------------------------
         emit_event(f"Rendering {total_ads} adaptations", 55, 0, f"Starting composite rendering for {len(plan_result.concepts)} concepts across {len(brief_model.outputFormats)} formats...", total=total_ads)
         ads: List[GeneratedAdArtifact] = []
         render_plans: List[FormatRenderPlan] = []
@@ -213,12 +252,16 @@ class CampaignPipelineRunner:
 
             product_slug = concept.product_slug or make_product_slug(concept.product_model, "orange" if "orange" in concept.product_role else "white")
             aud_slug = concept.audience_slug or make_audience_slug(concept.audience_name)
+            if brief_model.generation.conceptsPerAudience > 1:
+                aud_slug = make_audience_slug(concept.audience_name)
 
             # Product output folder
             prod_dir = products_output_dir / product_slug
             prod_dir.mkdir(parents=True, exist_ok=True)
 
             for output_fmt in brief_model.outputFormats:
+                if not any(plan.concept_id == concept.concept_id and plan.aspect_ratio == output_fmt.aspectRatio for plan in plan_result.render_plans):
+                    continue
                 ratio = output_fmt.aspectRatio
                 clean_ratio = ratio.replace(":", "x")
                 fmt_folder = prod_dir / clean_ratio
@@ -292,7 +335,9 @@ class CampaignPipelineRunner:
 
         render_plans = plan_result.render_plans
 
-        # Stage 7: Contact Sheet Generation
+        # ----------------------------------------------------------------------
+        # Stage 7: Master Campaign Contact Sheet Assembly
+        # ----------------------------------------------------------------------
         emit_event("Generating contact sheet", 78, completed_ads, f"Assembling master campaign contact sheet ({len(concepts)}x{len(brief_model.outputFormats)})...", total=total_ads)
         contact_sheet_local = run_dir / "contact-sheet.jpg"
         generate_campaign_contact_sheet(
@@ -307,7 +352,9 @@ class CampaignPipelineRunner:
 
         cs_preview_url = f"/api/outputs/{cs_rel_path}"
 
-        # Stage 8: Generate ZIP Bundle
+        # ----------------------------------------------------------------------
+        # Stage 8: ZIP Package Archiving
+        # ----------------------------------------------------------------------
         zip_local_path = run_dir / f"{brief_model.campaign.id}_{run_id}_all_{total_ads}_ads.zip"
         with zipfile.ZipFile(zip_local_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             for ad in ads:
@@ -319,7 +366,9 @@ class CampaignPipelineRunner:
         zip_rel_path = str(zip_local_path.relative_to(self.base_dir)).replace("\\", "/")
         zip_download_url = f"/api/outputs/{zip_rel_path}"
 
-        # Stage 9: Running deterministic checks & Quality Report
+        # ----------------------------------------------------------------------
+        # Stage 9: 8 Blocking Quality Checks (BLK-01 to BLK-08) & Report Generation
+        # ----------------------------------------------------------------------
         emit_event("Running checks", 85, completed_ads, "Executing blocking rules and quality heuristics...", total=total_ads)
         storage = get_storage_adapter()
         storage_status = storage.get_status()
@@ -344,7 +393,9 @@ class CampaignPipelineRunner:
             log_entry("Running checks", "ERROR", f"Quality checks failed: {err_summary}")
             raise RuntimeError(f"Deterministic Quality Checks Failed: {err_summary}")
 
-        # Stage 10: Generate Manifest & Secret-safe Pipeline Log
+        # ----------------------------------------------------------------------
+        # Stage 10: Manifest Generation & Storage Synchronization
+        # ----------------------------------------------------------------------
         manifest_data = {
             "campaignId": brief_model.campaign.id,
             "campaignName": brief_model.campaign.name,

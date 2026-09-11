@@ -95,8 +95,10 @@ class ConceptPlanner:
         # 4. Plan Audience Groups
         concepts_per_aud = brief.generation.conceptsPerAudience or 1
 
+        from backend.app.services.output_allocation import allocate_outputs
+        allocation = allocate_outputs(brief)
         for audience in brief.audiences:
-            for c_idx in range(concepts_per_aud):
+            for c_idx, assigned_formats in enumerate(allocation[audience.id]):
                 c_suffix = f"-v{c_idx+1}" if concepts_per_aud > 1 else ""
                 concept_id = f"concept-{brief.campaign.id}-{audience.id}{c_suffix}-{effective_seed}"
 
@@ -196,6 +198,8 @@ class ConceptPlanner:
 
                 # Step F: Expand Concept to Format Render Plans based on brief.outputFormats
                 for output_fmt in brief.outputFormats:
+                    if output_fmt.id not in assigned_formats:
+                        continue
                     ratio_name = output_fmt.aspectRatio
                     if ratio_name not in LAYOUT_CONFIGS:
                         continue

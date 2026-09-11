@@ -51,7 +51,7 @@ def generate_campaign_contact_sheet(
     draw.text((PADDING + 100, 32), f"|  {campaign_name.upper()}  —  CONTACT SHEET", font=font_title, fill=(0, 210, 255))
     draw.text(
         (PADDING, 85),
-        f"RUN ID: {run_id}    |    SEED: {seed}    |    6 AUDIENCES × 3 FORMATS = 18 OUTPUTS",
+        f"RUN ID: {run_id}    |    SEED: {seed}    |    {len(concepts)} CONCEPTS | {len(ads)} OUTPUTS",
         font=font_sub,
         fill=(160, 180, 200),
     )
@@ -62,9 +62,9 @@ def generate_campaign_contact_sheet(
         col_x = ROW_LABEL_WIDTH + PADDING + c_idx * (CELL_WIDTH + PADDING)
         draw.text((col_x + 10, HEADER_HEIGHT - 32), title, font=font_label, fill=(0, 210, 255))
 
-    # Map ads by (audience_id, aspect_ratio)
+    # Variations for the same audience must retain their own thumbnails.
     ad_map: Dict[Tuple[str, str], GeneratedAdArtifact] = {
-        (ad.audience_id, ad.aspect_ratio): ad for ad in ads
+        (ad.concept_id, ad.aspect_ratio): ad for ad in ads
     }
 
     # 2. Draw Audience Rows
@@ -106,7 +106,7 @@ def generate_campaign_contact_sheet(
             # Cell Card
             draw.rectangle([cell_x, cell_y, cell_x + CELL_WIDTH, cell_y + CELL_HEIGHT], fill=(8, 12, 16), outline=(30, 42, 55), width=1)
 
-            ad_item = ad_map.get((concept.audience_id, ratio))
+            ad_item = ad_map.get((concept.concept_id, ratio))
             if ad_item and os.path.exists(ad_item.local_path):
                 try:
                     with Image.open(ad_item.local_path) as ad_img:
@@ -124,7 +124,7 @@ def generate_campaign_contact_sheet(
                 except Exception as e:
                     draw.text((cell_x + 20, cell_y + CELL_HEIGHT // 2), f"Load Error: {e}", fill=(255, 100, 100))
             else:
-                draw.text((cell_x + 40, cell_y + CELL_HEIGHT // 2), "Output Pending", fill=(100, 120, 140))
+                draw.text((cell_x + 40, cell_y + CELL_HEIGHT // 2), "Not scheduled", fill=(100, 120, 140))
 
         curr_y += CELL_HEIGHT + PADDING
 

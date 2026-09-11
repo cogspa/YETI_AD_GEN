@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { CampaignBrief, BriefValidationResult } from '../types/campaign';
 import { SAMPLE_BRIEFS } from '../data/sampleBriefs';
+import { NaturalLanguageBrief } from './NaturalLanguageBrief';
 
 interface BriefUploadSectionProps {
   currentBrief: CampaignBrief;
@@ -110,8 +111,13 @@ export const BriefUploadSection: React.FC<BriefUploadSectionProps> = ({
   return (
     <section className="brief-section" aria-labelledby="brief-heading">
       <div className="section-header-label" id="brief-heading">
-        CAMPAIGN BRIEF (JSON)
+        CAMPAIGN BRIEF
       </div>
+
+      <NaturalLanguageBrief onApply={(brief, filename, sizeBytes) => {
+        onBriefChange(brief, filename, sizeBytes);
+        setIsInspectOpen(true);
+      }} />
 
       {/* Hidden file input */}
       <input

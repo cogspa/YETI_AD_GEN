@@ -52,6 +52,15 @@ def test_guardrail_prompt_construction(generator):
     assert "No coolers" in prompt or "no coolers" in prompt
 
 
+@pytest.mark.parametrize("activity", ["beach", "camping", "tailgating", "hiking"])
+def test_new_territory_prompt_does_not_keep_la_scenery(generator, activity):
+    prompt, _ = generator.build_prompt(activity, "Inland Empire", "Local foothills in evening light.")
+    assert "Inland Empire" in prompt
+    assert "Local foothills" in prompt
+    for wrong_location in ["Los Angeles", "Santa Monica", "Malibu", "Westwood", "San Gabriel"]:
+        assert wrong_location not in prompt
+
+
 def test_mock_background_generator_labeling(generator):
     """Confirm Mock provider outputs truthful provenance without claiming GenAI."""
     meta = generator.generate_background(activity="beach", force_mock=True)

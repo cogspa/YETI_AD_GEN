@@ -1,3 +1,36 @@
+/* Natural-language campaign intake */
+.natural-brief {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  margin-bottom: 18px;
+  border: 1px solid var(--color-panel-border);
+  border-radius: var(--radius-md);
+  background: var(--color-panel-bg);
+}
+.natural-brief-title { font-size: 18px; font-weight: 700; }
+.natural-brief p { font-size: 14px; }
+.natural-brief-textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid var(--color-panel-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font: inherit;
+  min-height: 130px;
+}
+.natural-brief-textarea:focus-visible { outline: 2px solid var(--color-blue-primary); outline-offset: 2px; }
+.natural-brief-hint { color: var(--color-text-muted); font-size: 12px !important; }
+.natural-brief-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.natural-brief button:disabled { opacity: .55; cursor: not-allowed; }
+.natural-brief-error { white-space: pre-wrap; }
+.natural-brief-draft { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--color-panel-border); min-width: 0; }
+.natural-brief-draft ul { padding-left: 22px; font-size: 13px; }
+.natural-brief-draft summary { cursor: pointer; font-weight: 600; }
+.natural-brief-json { max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; padding: 12px; background: var(--color-bg); }
+
 /* YETI Creative Automation Styles */
 :root {
   --color-bg: #FFFFFF;
@@ -1371,4 +1404,3 @@ body {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-

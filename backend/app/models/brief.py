@@ -27,8 +27,8 @@ def validate_portable_path(path_str: str, field_name: str) -> str:
 
 
 class CampaignAgeRange(BaseModel):
-    minimum: int = Field(ge=20, le=30, description="Minimum campaign age")
-    maximum: int = Field(ge=20, le=30, description="Maximum campaign age")
+    minimum: int = Field(ge=20, le=120, description="Minimum campaign age")
+    maximum: int = Field(ge=20, le=120, description="Maximum campaign age")
 
     @model_validator(mode="after")
     def validate_min_max(self):
@@ -38,8 +38,8 @@ class CampaignAgeRange(BaseModel):
 
 
 class AudienceAgeRange(BaseModel):
-    minimum: int = Field(ge=20, le=30, description="Minimum target age")
-    maximum: int = Field(ge=20, le=30, description="Maximum target age")
+    minimum: int = Field(ge=20, le=120, description="Minimum target age")
+    maximum: int = Field(ge=20, le=120, description="Maximum target age")
     band: Optional[Literal["younger", "older"]] = None
 
     @model_validator(mode="after")
@@ -47,13 +47,13 @@ class AudienceAgeRange(BaseModel):
         if self.minimum > self.maximum:
             raise ValueError(f"Age minimum ({self.minimum}) cannot exceed age maximum ({self.maximum}).")
         
-        # Enforce that individual audience age range does not cross younger (20-24) and older (25-30) bands
+        # Enforce that individual audience age range does not cross younger (20-24) and older (25+) bands
         is_younger = self.maximum <= 24
         is_older = self.minimum >= 25
         
         if not (is_younger or is_older):
             raise ValueError(
-                f"Audience age range {self.minimum}–{self.maximum} crosses across the 20–24 (younger) and 25–30 (older) age bands. Must belong strictly to one band."
+                f"Audience age range {self.minimum}–{self.maximum} crosses across the 20–24 (younger) and 25+ (older) age bands. Must belong strictly to one band."
             )
         
         return self
@@ -89,6 +89,7 @@ class GenerationSettings(BaseModel):
     totalAudienceGroups: Optional[int] = Field(default=None, ge=1)
     adsPerAudience: Optional[int] = Field(default=None, ge=1)
     totalOutputsPerRun: Optional[int] = Field(default=None, ge=1)
+    exactOutputCount: Optional[int] = Field(default=None, ge=1, le=216)
     randomizeOncePerAudience: bool = True
     renderAllFormatsFromSameConcept: bool = True
     selectionRules: Optional[Dict[str, str]] = None
@@ -96,7 +97,7 @@ class GenerationSettings(BaseModel):
 
     @model_validator(mode="after")
     def validate_quantities(self):
-        if self.totalAudienceGroups and self.adsPerAudience and self.totalOutputsPerRun:
+        if self.exactOutputCount is None and self.totalAudienceGroups and self.adsPerAudience and self.totalOutputsPerRun:
             expected_total = self.totalAudienceGroups * self.adsPerAudience
             if self.totalOutputsPerRun != expected_total:
                 # Synchronize if mismatch
@@ -189,23 +190,10 @@ class Audience(BaseModel):
             )
         if self.age.minimum >= 25 and self.productColor != "white":
             raise ValueError(
-                f"Audience {self.id} ({self.name}) age {self.age.minimum}–{self.age.maximum} is in the older band (25–30) and MUST use 'white' product, but specified '{self.productColor}'."
+                f"Audience {self.id} ({self.name}) age {self.age.minimum}–{self.age.maximum} is in the older band (25+) and MUST use 'white' product, but specified '{self.productColor}'."
             )
         
-        # 2. Activity to Background Pool Mapping
-        if self.activity == "beach" and self.backgroundPoolId != "beach-west-coast":
-            raise ValueError(
-                f"Audience {self.id} ({self.name}) has activity 'beach' and must resolve strictly to 'beach-west-coast' background pool, but found '{self.backgroundPoolId}'."
-            )
-        elif self.activity == "camping" and self.backgroundPoolId != "camping-la-mountains":
-            raise ValueError(
-                f"Audience {self.id} ({self.name}) has activity 'camping' and must resolve strictly to 'camping-la-mountains' background pool, but found '{self.backgroundPoolId}'."
-            )
-        elif self.activity == "tailgating" and self.backgroundPoolId not in ["tailgating-westwood", "tailgating-south-central"]:
-            raise ValueError(
-                f"Audience {self.id} ({self.name}) has activity 'tailgating' and must resolve strictly to Westwood or South Central tailgating pool, but found '{self.backgroundPoolId}'."
-            )
-        
+        # Pool integrity is checked against the brief, not a fixed location list.
         return self
 
 
@@ -298,16 +286,33 @@ class CampaignBriefModel(BaseModel):
                 )
 
         # 3. Synchronize total outputs calculation
+        if self.generation.exactOutputCount is not None:
+            from backend.app.services.output_allocation import allocate_outputs
+            if self.generation.exactOutputCount < len(self.audiences):
+                raise ValueError("The exact ad count must give each audience at least one output.")
+            allocation = allocate_outputs(self)
+            self.generation.conceptsPerAudience = max(len(groups) for groups in allocation.values())
+            self.generation.totalOutputsPerRun = self.generation.exactOutputCount
+            self.generation.totalAudienceGroups = len(self.audiences)
+            per_audience, remainder = divmod(self.generation.exactOutputCount, len(self.audiences))
+            self.generation.adsPerAudience = None if remainder else per_audience
+            self.generation.renderAllFormatsFromSameConcept = all(
+                len(group) == len(self.outputFormats) for groups in allocation.values() for group in groups
+            )
         expected_total = len(self.audiences) * len(self.outputFormats) * self.generation.conceptsPerAudience
-        if self.generation.totalOutputsPerRun is None or self.generation.totalOutputsPerRun != expected_total:
+        if self.generation.exactOutputCount is None and (self.generation.totalOutputsPerRun is None or self.generation.totalOutputsPerRun != expected_total):
             self.generation.totalOutputsPerRun = expected_total
         if self.generation.totalAudienceGroups is None:
             self.generation.totalAudienceGroups = len(self.audiences)
-        if self.generation.adsPerAudience is None:
+        if self.generation.exactOutputCount is None and self.generation.adsPerAudience is None:
             self.generation.adsPerAudience = len(self.outputFormats) * self.generation.conceptsPerAudience
 
 
-        # 4. Verify all backgroundPoolIds and taglinePoolIds exist
+        # 4. Verify pool references and their semantic assignments.
+        backgrounds = {p.id: p for p in self.backgroundPools}
+        taglines = {p.id: p for p in self.taglinePools}
+        if len(backgrounds) != len(self.backgroundPools) or len(taglines) != len(self.taglinePools):
+            raise ValueError("Background and tagline pool IDs must be unique.")
         bg_pool_ids = {p.id for p in self.backgroundPools}
         tagline_pool_ids = {p.id for p in self.taglinePools}
 
@@ -321,9 +326,16 @@ class CampaignBriefModel(BaseModel):
                     f"Audience {aud.id} references undefined taglinePoolId '{aud.taglinePoolId}'."
                 )
 
+            pool = backgrounds[aud.backgroundPoolId]
+            if pool.activity != aud.activity:
+                raise ValueError(f"Audience {aud.id} activity '{aud.activity}' does not match background pool activity '{pool.activity}'.")
+            if pool.territory.strip().casefold() != aud.territory.strip().casefold():
+                raise ValueError(f"Audience {aud.id} territory does not match background pool territory.")
+            if taglines[aud.taglinePoolId].activity != aud.activity:
+                raise ValueError(f"Audience {aud.id} activity does not match tagline pool activity.")
+
         return self
 
 
 # Alias for concise typing
 CampaignBrief = CampaignBriefModel
-
