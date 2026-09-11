@@ -248,6 +248,47 @@ def generate_campaign_endpoint(
         raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
 
 
+# ==============================================================================
+# FASTAPI USAGE (Background Contrast & Logo Selection Route):
+# Evaluates an auto-generated or static background image to determine if it is
+# light or dark in the brand logo placement zone, returning perceptual luminance
+# metrics and recommending the high-contrast logo asset.
+# ==============================================================================
+from pydantic import BaseModel, Field
+from backend.app.services.contrast_checker import BackgroundContrastChecker, ContrastAnalysisResult
+
+contrast_checker = BackgroundContrastChecker()
+
+
+class ContrastAnalyzeRequest(BaseModel):
+    # PYDANTIC RULE: Optional file path to local image asset; defaults to sample beach scene.
+    image_path: Optional[str] = Field(None, description="Path to background image on disk.")
+    # PYDANTIC RULE: Region to sample: 'top_logo_zone' (top 30%) or 'full_canvas'.
+    sample_zone: str = Field("top_logo_zone", description="'top_logo_zone' or 'full_canvas'")
+    # PYDANTIC RULE: Luminance cutoff between dark (< threshold) and light (>= threshold).
+    threshold: float = Field(0.50, description="Luminance threshold separating dark from light (0.0 - 1.0).", ge=0.0, le=1.0)
+
+
+@app.post("/api/contrast/analyze", response_model=ContrastAnalysisResult)
+def analyze_contrast_endpoint(req: ContrastAnalyzeRequest = Body(...)):
+    """
+    Analyzes background image contrast and selects the optimal brand logo:
+    - Dark background -> Light Logo (assets/brand/Yeti_Logo_4.png)
+    - Light background -> Dark Logo (assets/brand/Yeti_Logo_1.png)
+    """
+    try:
+        target = req.image_path or "assets/backgrounds/Beach.jpg"
+        return contrast_checker.analyze_background(
+            image_or_path=target,
+            sample_zone=req.sample_zone,
+            threshold=req.threshold,
+        )
+    except FileNotFoundError as fnfe:
+        raise HTTPException(status_code=404, detail=str(fnfe))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 from pathlib import Path
 from fastapi.responses import FileResponse, Response
 

@@ -23,6 +23,7 @@ from backend.app.services.compositor import AdCompositor
 from backend.app.services.contact_sheet import generate_campaign_contact_sheet
 from backend.app.services.quality_checker import QualityChecker, redact_secrets
 from backend.app.services.storage import get_storage_adapter, StorageAdapter
+from backend.app.services.contrast_checker import BackgroundContrastChecker
 
 
 class CampaignPipelineRunner:
@@ -47,6 +48,7 @@ class CampaignPipelineRunner:
         gemini_generator: Optional[GeminiBackgroundGenerator] = None,
         compositor: Optional[AdCompositor] = None,
         quality_checker: Optional[QualityChecker] = None,
+        contrast_checker: Optional[BackgroundContrastChecker] = None,
         local_base_dir: str = "outputs",
     ):
         self.resolver = asset_resolver or AssetResolver()
@@ -55,6 +57,7 @@ class CampaignPipelineRunner:
         self.compositor = compositor or AdCompositor()
         self.planner = ConceptPlanner(self.resolver)
         self.checker = quality_checker or QualityChecker()
+        self.contrast_checker = contrast_checker or BackgroundContrastChecker()
         self.base_dir = Path(local_base_dir).resolve()
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
@@ -206,7 +209,32 @@ class CampaignPipelineRunner:
                 concept.selected_background_path = bg_result.local_path
                 gemini_used = True
                 gemini_audiences.append(concept.audience_id)
-                log_entry("Generating missing backgrounds", "INFO", f"AI background generated for {concept.audience_id}", {"provenance": bg_result.provenance})
+
+                # ==============================================================================
+                # DYNAMIC CONTRAST CHECKING FOR AUTO-GENERATED IMAGES:
+                # Read auto-generated background and determine if the logo placement zone is
+                # light or dark. Automatically assign the high-contrast YETI brand mark:
+                # - Dark background (< 0.50 luminance) -> Light Logo (assets/brand/Yeti_Logo_4.png)
+                # - Light background (>= 0.50 luminance) -> Dark Logo (assets/brand/Yeti_Logo_1.png)
+                # ==============================================================================
+                contrast_res = self.contrast_checker.analyze_background(concept.selected_background_path)
+                concept.logo_asset_path = contrast_res.recommended_logo_path
+                for plan in plan_result.render_plans:
+                    if plan.concept_id == concept.concept_id:
+                        plan.logo_asset_path = contrast_res.recommended_logo_path
+
+                log_entry(
+                    "Generating missing backgrounds",
+                    "INFO",
+                    f"Contrast check for {concept.audience_id}: {contrast_res.classification.upper()} "
+                    f"(luminance {contrast_res.luminance:.2f}) -> assigned {contrast_res.recommended_logo_role}",
+                    {
+                        "provenance": bg_result.provenance,
+                        "luminance": contrast_res.luminance,
+                        "classification": contrast_res.classification,
+                        "assigned_logo": contrast_res.recommended_logo_path,
+                    },
+                )
 
         # Create output directories for this run
         run_dir = self.base_dir / brief_model.campaign.id / "runs" / run_id

@@ -107,7 +107,7 @@ Open **`http://localhost:5173`** in your browser.
 11. [Same-Concept Ratio Adaptation](#11-same-concept-ratio-adaptation)
 12. [Dropbox Cloud Storage & Configuration](#12-dropbox-cloud-storage--configuration)
 13. [Google Gemini AI Scene Generation & Fallback Architecture](#13-google-gemini-ai-scene-generation--fallback-architecture)
-14. [Controlled Assets & Human Review Governance](#14-controlled-assets--human-review-governance)
+14. [Brand Compliance Measures & Automated Background Contrast Checking](#14-brand-compliance-measures--automated-background-contrast-checking)
 15. [Prerequisites & Fresh-Clone Setup](#15-prerequisites--fresh-clone-setup)
 16. [Secret-Free Environment Configuration](#16-secret-free-environment-configuration)
 17. [Running the Baseline 18-Ad Campaign](#17-running-the-baseline-18-ad-campaign)
@@ -513,8 +513,42 @@ The compositor applies ratio-specific coordinate grids and scaling without alter
 
 ---
 
-## 14. Controlled Assets & Human Review Governance
+## 14. Brand Compliance Measures & Automated Background Contrast Checking
 
+The generator enforces deterministic brand safety and legibility through **8 Blocking Compliance Measures** and an **Automated Background Contrast Checking & Dynamic Logo Selection Engine**:
+
+### The 8 Deterministic Blocking Compliance Measures
+Every ad variation must pass 8 strict deterministic checks in [`backend/app/services/quality_checker.py`](backend/app/services/quality_checker.py) before publication. If even a single check fails, the pipeline halts with `RuntimeError` and marks the campaign as failed:
+
+| Check ID | Measure Name | Rule & Deterministic Failure Criteria |
+| :--- | :--- | :--- |
+| **BLK-01** | **Exact Concept & Output Quantities** | Actual concept count and rendered ad count must exactly match the brief allocation (e.g. 6 concepts, 18 ads). |
+| **BLK-02** | **Exact Pixel Dimensions** | Actual pixel dimensions must strictly match channel requirements: `1:1` (1080×1080), `16:9` (1920×1080), `9:16` (1080×1920). Zero pixel tolerance. |
+| **BLK-03** | **Source Asset Integrity & Validity** | Product packshots and brand marks must exist on disk, have non-zero file sizes, and pass cryptographic SHA-256 integrity verification. |
+| **BLK-04** | **Age to Product Color Targeting** | Enforces demographic pairing: audiences $\le 24$ must receive Orange coolers; audiences $\ge 25$ must receive White coolers. |
+| **BLK-05** | **Activity/Territory Background Assignment** | Background imagery must correspond to persona activity: Beach uses beach imagery, Camping uses mountain/camp scenes, Tailgating uses tailgate scenes. |
+| **BLK-06** | **Tagline Color Contrast Standard** | Enforces text legibility against background tones: Beach uses black text (`#000000`); Camping/Tailgating/Outdoor use white text (`#FFFFFF`). |
+| **BLK-07** | **Format Concept & Asset Locking** | Cross-format creative locking: all 3 formats (`1:1`, `16:9`, `9:16`) for a concept must share identical background, cooler, tagline, and logo assets. |
+| **BLK-08** | **Packshot Aspect Ratio Preservation** | Proportional bounding-box scaling (`fit_within_region`) enforces a maximum distortion tolerance of $0.0\%$, preventing squished or warped coolers. |
+
+### Automated Background Contrast Checking & Dynamic Logo Selection
+To support open-ended outdoor activities and AI-generated scenes (via Google Gemini or procedural fallback), the engine features a dedicated contrast checking service ([`backend/app/services/contrast_checker.py`](backend/app/services/contrast_checker.py)):
+
+1. **Logo Zone Luminance Sampling**:
+   - Rather than computing the average of the whole image (which misleads when bright skies sit over dark terrain), the analyzer samples the **top 30% quadrant** ($X \in [0.10, 0.90]$, $Y \in [0.0, 0.30]$) where the YETI brand mark is anchored.
+   - Computes weighted ITU-R BT.601 perceptual luminance:
+     $$L = \frac{0.299 \cdot R + 0.587 \cdot G + 0.114 \cdot B}{255.0}$$
+2. **Dynamic Logo Selection Logic**:
+   - **Dark Background ($L < 0.50$)**: Automatically assigns the **Light Logo** (`assets/brand/Yeti_Logo_4.png`, crisp white wordmark).
+   - **Light Background ($L \ge 0.50$)**: Automatically assigns the **Dark Logo** (`assets/brand/Yeti_Logo_1.png`, crisp black wordmark).
+3. **Pipeline & Gradient Synergy**:
+   - During Stage 5 of the pipeline ([`pipeline_runner.py`](backend/app/services/pipeline_runner.py)), auto-generated backgrounds are analyzed immediately upon synthesis.
+   - `concept.logo_asset_path` and matching `render_plans` are updated to maintain 100% format locking (`BLK-07`).
+   - The compositor ([`compositor.py`](backend/app/services/compositor.py)) automatically pairs the white logo with `#grad2.png` (dark top gradient) or the black logo with `#grad2_white.png` (light top gradient) for maximum readability.
+4. **API Endpoint**:
+   - `POST /api/contrast/analyze` allows inspecting contrast metrics and recommendations for any image file path.
+
+### Controlled Assets & Human Review Governance
 - **Zero packshot distortion** — product packshots and logos keep intact aspect ratios via bicubic resampling.
 - **Human review badge** — any adaptation using an AI-generated background is tagged `human_review_required: true` and shown with an orange warning badge in both the JSON report and the UI.
 - **Provenance tracking** — every output records its source asset paths and generation seed in `generation-manifest.json`.
@@ -621,10 +655,10 @@ python generate_ads.py --brief yeti_la_random_ad_campaign_72.json --seed 42
 
 ---
 
-## 19. Automated Test Suite (107 Tests)
+## 19. Automated Test Suite (127 Tests)
 
 ```bash
-# 1. Backend pytest (99 passing tests across conversion, validation, compositor, QA)
+# 1. Backend pytest (119 passing tests across conversion, validation, compositor, contrast checking, QA)
 PYTHONPATH=. .venv/bin/pytest backend/tests/ -v
 
 # 2. Frontend Vitest unit tests (8 tests across NaturalLanguageBrief and App)
@@ -888,7 +922,7 @@ To store generated campaign runs in Firebase Cloud Storage:
 
 ---
 
-## 28. Live Cloud Architecture & Feature Updates (v2.1)
+## 28. Live Cloud Architecture & Feature Updates (v2.2)
 
 ### 1. Multi-Tier Full-Stack Deployment
 - **Frontend Dashboard (Netlify)**: [https://yeti-ad-generator.netlify.app](https://yeti-ad-generator.netlify.app)
@@ -899,11 +933,13 @@ To store generated campaign runs in Firebase Cloud Storage:
   - Provisioned with **2 GiB RAM**, **2 vCPUs**, and **600s request timeout** for high-throughput canvas rendering.
   - **Zero-Cost Idle Scaling**: Scales down to 0 container instances when idle, incurring $0.00 hosting cost within Google Cloud's monthly Free Tier.
 
-### 2. Pluggable Cloud Storage Engine
-- **Triple-Adapter Architecture**: Seamlessly switches between `local`, `dropbox`, and `firebase` modes via `STORAGE_MODE`.
-- **Resilient Media Serving**: Output streaming handler with local caching, automatic fallback to cloud storage, and client-side cache headers (`max-age=86400`).
+### 2. Automated Background Contrast Checking & Dynamic Logo Selection
+- **Zone-Specific Luminance Analysis**: Evaluates the top 30% canvas region where the YETI logo sits using weighted ITU-R BT.601 perceptual luminance.
+- **Dynamic Wordmark Selection**: Automatically assigns the white logo (`Yeti_Logo_4.png`) on dark backgrounds ($L < 0.50$) and black logo (`Yeti_Logo_1.png`) on light backgrounds ($L \ge 0.50$).
+- **Synergistic Gradient Pairing**: Automatically pairs with `#grad2.png` (dark top gradient) or `#grad2_white.png` (light top gradient).
+- **Public API Route**: Exposed via `POST /api/contrast/analyze`.
 
 ### 3. Verification & Benchmark Summary
-- **Backend Tests**: 53/53 Unit & Integration Tests Passing (100%).
-- **Frontend Build & Tests**: Vite production build (0 warnings) and 3/3 Vitest tests passing.
+- **Backend Tests**: 119/119 Unit & Integration Tests Passing (100%).
+- **Frontend Build & Tests**: Vite production build (0 errors) and Vitest tests passing.
 - **Local CLI**: `python generate_ads.py --brief yeti_la_random_ad_campaign.json --seed 42` renders 18 ads in 22s completely offline.
