@@ -137,10 +137,18 @@ def compile_brief(intent: BriefIntent) -> dict:
     used_pools = {a["backgroundPoolId"] for a in brief["audiences"]}
     activities = {a["activity"] for a in brief["audiences"]}
     brief["backgroundPools"] = [copy.deepcopy(p) for p in pools.values() if p["id"] in used_pools]
-    brief["taglinePools"] = [copy.deepcopy(p) for p in catalog["taglinePools"] if p["activity"] in activities]
-    # The renderer uses the approved GO ANYWHERE overlays, not arbitrary generated copy.
-    for pool in brief["taglinePools"]:
-        pool["taglines"] = ["GO ANYWHERE"]
+    brief["taglinePools"] = []
+    for act in sorted(activities):
+        is_beach = act in {"beach", "surfing"}
+        color = "#000000" if is_beach else "#FFFFFF"
+        color_name = "Black" if is_beach else "White"
+        brief["taglinePools"].append({
+            "id": f"{act}-taglines",
+            "activity": act,
+            "textColor": color,
+            "colorName": color_name,
+            "taglines": ["GO ANYWHERE"],
+        })
     brief["taglineAssets"] = copy.deepcopy(catalog["taglineAssets"])
     for color, asset in brief["taglineAssets"].items():
         asset["activities"] = sorted(a for a in activities if (a in {"beach", "surfing"}) == (color == "black"))
@@ -150,17 +158,22 @@ def compile_brief(intent: BriefIntent) -> dict:
     brief["creativeRules"]["tagline"]["activityRules"] = {}
     for activity in sorted(activities):
         source = "beach" if activity in {"beach", "surfing"} else "camping"
-        rule = copy.deepcopy(original_activity_rules[source])
+        rule = copy.deepcopy(original_activity_rules.get(source, original_activity_rules.get("camping", {})))
         rule["allowedBackgroundPoolIds"] = [p["id"] for p in brief["backgroundPools"] if p["activity"] == activity]
         rule["taglinePoolId"] = f"{activity}-taglines"
+        rule["taglineAssetId"] = "tagline-overlay-black" if activity in {"beach", "surfing"} else "tagline-overlay-white"
+        rule["taglineTextColor"] = "#000000" if activity in {"beach", "surfing"} else "#FFFFFF"
+        rule["taglineColorName"] = "Black" if activity in {"beach", "surfing"} else "White"
         brief["activityRules"][activity] = rule
-        brief["creativeRules"]["tagline"]["activityRules"][activity] = copy.deepcopy(original_tagline_rules[source])
+        brief["creativeRules"]["tagline"]["activityRules"][activity] = copy.deepcopy(
+            original_tagline_rules.get(source, original_tagline_rules.get("camping", {}))
+        )
     brief["generation"]["selectionRules"] = copy.deepcopy(catalog["generation"]["selectionRules"])
     brief["generation"]["selectionRules"]["formats"] = (
         "Render only each concept's assigned formats to reach the exact output count."
         if intent.totalOutputs is not None else "Render each selected concept in every selected output format."
     )
-    brief["composition"]["taglineColorRule"] = "Black for beach/surfing; white for camping/tailgating/hiking/fishing/climbing."
+    brief["composition"]["taglineColorRule"] = "Black for beach/surfing; white for camping, tailgating, and all other outdoor activities."
     brief["creativeRules"]["product"]["ageBandColorRules"]["older"]["maxAge"] = 120
     brief["qualityChecks"] = [
         check.replace("all three output formats", "all selected output formats")
@@ -202,10 +215,13 @@ async def convert_natural_language_brief(text: str) -> dict:
         "Use null for unspecified optional details; assumptions must list any inferred audience age, model or location. "
         "The app supports audiences aged 20–120 in any geographic territory, orange coolers for 20–24, white for 25+, "
         "Roadie 24 or Tundra 45 model metadata, and the fixed approved GO ANYWHERE tagline/logo artwork. "
+        "Open-ended activities: support ANY outdoor, recreation, sports, adventure, or lifestyle activity mentioned by the user "
+        "(such as skiing, snowboarding, camping, beach, tailgating, hiking, surfing, fishing, climbing, kayaking, boating, trail running, mountain biking, paddleboarding, golf, etc.). "
+        "The backend dynamically provisions background and tagline pools for any activity, and generates location/activity-appropriate AI scenes when needed. "
         "The backend splits audiences crossing age 25. Choose audiences according to the request, not all catalog entries. "
         "For 72 ads with 12 default audiences, use the twelve sample audiences provided. Set each audience's activity and territory. "
         "Use a catalog backgroundPoolId only if BOTH its activity and location match. Otherwise set it to null: "
-        "the backend creates a new pool with no assets and Gemini generates a location-appropriate background later. "
+        "the backend creates a new pool with no assets and Gemini generates a location- and activity-appropriate background later. "
         "Set visualDirection to a requested scene description or null. Never substitute an LA location for another region. "
         "Set market to the user's geography. If a location or age is given, create matching audiences even when no activity is supplied: "
         "choose a plausible outdoor activity for that location and disclose it in assumptions. Never use beach/surf scenes for inland terrain. "
@@ -218,8 +234,7 @@ async def convert_natural_language_brief(text: str) -> dict:
         "Record explicit totalOutputs separately from conceptsPerAudience; never adjust an explicit quantity. "
         "Any exact total is supported; it does NOT need to be divisible by formats or audiences. "
         "The backend distributes that total and allows partially filled concepts. Leave conceptsPerAudience null unless the user explicitly specifies it. "
-        "Use questions for incompatible colors/ages below 20, unsupported activities, products, dimensions, "
-        "custom visible copy/artwork, or unclear essential details. Do not silently drop any unsupported requirement. "
+        "Use questions ONLY for incompatible ages below 20, non-cooler products (only Roadie 24 and Tundra 45 exist), dimensions outside 1:1, 16:9, 9:16, custom visible copy/artwork (only GO ANYWHERE is supported), or unclear essential details. Do NOT reject or question any outdoor, sports, or lifestyle activity (such as skiing, snow sports, water sports, etc.) — they are fully supported. "
         "If the input is unrelated to campaigns, ask for campaign details. Never invent file paths or claim to have generated ads. "
         "These are reusable activity/location pools, not a geographic allowlist: " + json.dumps(supported) +
         " Sample audiences: " + json.dumps(catalog["audiences"])

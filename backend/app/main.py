@@ -47,6 +47,23 @@ app.add_middleware(
 resolver = AssetResolver()
 
 
+from backend.app.models.layout import LAYOUT_CONFIGS, LayoutPreviewRequest
+from backend.app.services.layout_preview import render_layout_preview
+
+
+@app.get("/api/layouts")
+def get_default_layouts():
+    return {ratio: layout.model_dump() for ratio, layout in LAYOUT_CONFIGS.items()}
+
+
+@app.post("/api/layout/preview")
+def preview_layout(request: LayoutPreviewRequest):
+    try:
+        return render_layout_preview(request)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="The sample layout could not be rendered. Check the approved preview assets.") from exc
+
+
 @app.get("/api/health")
 def health_check():
     return {"status": "ok", "app": "YETI Ad Generator", "version": "1.0.0"}

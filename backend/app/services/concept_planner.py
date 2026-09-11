@@ -203,7 +203,8 @@ class ConceptPlanner:
                     ratio_name = output_fmt.aspectRatio
                     if ratio_name not in LAYOUT_CONFIGS:
                         continue
-                    layout_cfg = LAYOUT_CONFIGS[ratio_name]
+                    from backend.app.models.layout import resolve_layout
+                    layout_cfg = resolve_layout(ratio_name, brief.layoutOverrides.get(ratio_name))
                     clean_ratio = ratio_name.replace(":", "x")
                     plan_id = f"plan-{concept.concept_id}-{clean_ratio}"
                     target_filename = f"{audience.id}_{aud_slug}{c_suffix}_{product_slug}_{clean_ratio}.png"

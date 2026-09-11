@@ -1,4 +1,5 @@
 import type { BriefValidationResult, CampaignBrief } from '../types/campaign';
+import type { AspectRatio, DefaultLayout, LayerName, LayoutOverride } from '../types/campaign';
 export type { CampaignBrief, BriefValidationResult };
 
 
@@ -25,6 +26,29 @@ export interface AssetReadinessReport {
 }
 
 export const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL ? String(import.meta.env.VITE_API_URL).replace(/\/$/, '') : '');
+
+export async function fetchDefaultLayouts(): Promise<Record<AspectRatio, DefaultLayout>> {
+  const response = await fetch(`${API_BASE}/api/layouts`);
+  if (!response.ok) throw new Error('Could not load layouts. Check that the backend is running.');
+  return response.json();
+}
+
+export interface LayoutPreview {
+  image: string;
+  assetSizes: Record<LayerName, [number, number]>;
+  canvasWidth: number;
+  canvasHeight: number;
+}
+
+export async function previewLayout(aspectRatio: AspectRatio, layout: LayoutOverride,
+  activity: string, productColor: string, signal: AbortSignal): Promise<LayoutPreview> {
+  const response = await fetch(`${API_BASE}/api/layout/preview`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ aspectRatio, layout, activity, productColor }), signal,
+  });
+  if (!response.ok) throw new Error('Could not update the preview. Keep each element inside the canvas and check the backend connection.');
+  return response.json();
+}
 
 export interface BriefConversionResult {
   brief: CampaignBrief;

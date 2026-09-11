@@ -64,6 +64,7 @@ export interface TaglinePool {
 }
 
 export interface CampaignBrief {
+  layoutOverrides?: Partial<Record<AspectRatio, LayoutOverride>>;
   schemaVersion: string;
   campaign: CampaignMeta;
   generation?: {
@@ -101,6 +102,19 @@ export interface CampaignBrief {
     manifestFilename: string;
   };
 }
+
+export type AspectRatio = '1:1' | '16:9' | '9:16';
+export type LayerName = 'logo_region' | 'product_region' | 'tagline_region';
+export interface LayoutRegion {
+  x: number;
+  y: number;
+  max_width_pct: number;
+  max_height_pct: number;
+  anchor_x: 'left' | 'center' | 'right';
+  anchor_y: 'top' | 'center' | 'bottom';
+}
+export type LayoutOverride = Partial<Record<LayerName, LayoutRegion | null>>;
+export type DefaultLayout = Record<LayerName, LayoutRegion> & { canvas_width: number; canvas_height: number };
 
 export interface BriefValidationResult {
   isValid: boolean;

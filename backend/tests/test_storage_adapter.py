@@ -101,12 +101,13 @@ def test_dropbox_adapter_path_normalization():
 
 def test_dropbox_adapter_status_unconfigured():
     """Verify unconfigured Dropbox status returns clean non-leaking status."""
-    adapter = DropboxStorageAdapter(access_token=None)
-    status = adapter.get_status()
-    assert status.configured is False
-    assert status.reachable is False
-    assert status.mode == "dropbox"
-    assert "not configured" in status.error.lower()
+    with patch.dict(os.environ, {"DROPBOX_ACCESS_TOKEN": "", "DROPBOX_REFRESH_TOKEN": "", "DROPBOX_APP_KEY": "", "DROPBOX_APP_SECRET": ""}):
+        adapter = DropboxStorageAdapter(access_token=None, refresh_token=None, app_key=None, app_secret=None)
+        status = adapter.get_status()
+        assert status.configured is False
+        assert status.reachable is False
+        assert status.mode == "dropbox"
+        assert "not configured" in status.error.lower()
 
 
 @patch("dropbox.Dropbox")
@@ -177,7 +178,7 @@ def test_dropbox_adapter_mocked_operations(mock_dbx_class, tmp_path):
 
 def test_storage_factory():
     """Verify get_storage_adapter factory honors environment and force_local flag."""
-    with patch.dict(os.environ, {"DROPBOX_ACCESS_TOKEN": ""}):
+    with patch.dict(os.environ, {"DROPBOX_ACCESS_TOKEN": "", "DROPBOX_REFRESH_TOKEN": ""}):
         local_adapter = get_storage_adapter()
         assert isinstance(local_adapter, LocalStorageAdapter)
 

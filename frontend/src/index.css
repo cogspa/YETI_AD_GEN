@@ -1,3 +1,27 @@
+.layout-editor { margin: 20px 0; border: 1px solid var(--color-panel-border); border-radius: 10px; overflow: hidden; }
+.layout-heading { width: 100%; border: 0; padding: 18px; background: var(--color-panel-bg); color: var(--color-navy); display: flex; justify-content: space-between; gap: 12px; cursor: pointer; font-weight: 700; }
+.layout-editor-body { padding: 18px; display: grid; gap: 16px; font-size: 14px; }
+.layout-format-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.layout-format-tabs button { flex: 1; padding: 10px; background: white; color: var(--color-navy); border: 1px solid var(--color-panel-border); border-radius: 6px; cursor: pointer; }
+.layout-format-tabs button[aria-pressed="true"] { background: var(--color-blue-subtle); border-color: var(--color-blue-primary); }
+.layout-format-tabs span { display: block; font-size: 11px; }
+.layout-editor-grid { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 20px; }
+.layout-board { width: 100%; position: relative; margin: 0 auto; background: #23352d; overflow: hidden; }
+.layout-board > img { width: 100%; height: 100%; display: block; }
+.layout-preview-placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: white; }
+.layout-element { position: absolute; background: transparent; border: 1px dashed #b5dfff; cursor: grab; touch-action: none; padding: 0; }
+.layout-element-selected { border: 2px solid #00d2ff; z-index: 2; }
+.layout-element:focus-visible { outline: 3px solid #ffae00; }
+.layout-element span { position: absolute; left: 0; top: 0; color: white; background: #06263fe8; padding: 1px 4px; font-size: 10px; pointer-events: none; }
+.layout-element:active { cursor: grabbing; }
+.layout-controls { border: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.layout-controls legend { font-weight: 700; margin-bottom: 10px; }
+.layout-controls label, .layout-sample-controls label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; }
+.layout-controls input, .layout-controls select, .layout-sample-controls select { width: 100%; padding: 7px; border: 1px solid var(--color-panel-border); border-radius: 5px; background: white; color: var(--color-navy); }
+.layout-sample-controls { display: flex; gap: 12px; margin-top: 12px; }
+.layout-hint, .layout-status { font-size: 11px; color: var(--color-text-muted); margin-top: 8px; }
+@media (max-width: 600px) { .layout-editor-grid { grid-template-columns: 1fr; } .layout-controls { display: grid; grid-template-columns: 1fr 1fr; } .layout-controls .layout-hint { grid-column: 1 / -1; } }
+
 /* Natural-language campaign intake */
 .natural-brief {
   display: grid;

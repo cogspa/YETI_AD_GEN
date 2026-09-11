@@ -9,6 +9,8 @@ from backend.app.models.layout import (
     RatioLayoutConfig,
     NormalizedRegion,
     LAYOUT_CONFIGS,
+    LayoutOverride,
+    resolve_layout,
 )
 
 
@@ -313,6 +315,7 @@ class AdCompositor:
         logo_gradient_path: Optional[str] = "assets/gradients/#grad2.png",
         logo_white_gradient_path: Optional[str] = "assets/gradients/#grad2_white.png",
         logo_asset_path: Optional[str] = None,
+        layout_override: Optional[LayoutOverride] = None,
     ) -> Image.Image:
         """
         Render a finished ad in the requested aspect ratio following strict layer ordering:
@@ -324,7 +327,7 @@ class AdCompositor:
         6. selectedTaglineAsset
         7. selectedBrandLogo
         """
-        layout = LAYOUT_CONFIGS.get(aspect_ratio)
+        layout = resolve_layout(aspect_ratio, layout_override)
         if not layout:
             raise ValueError(f"Unsupported aspect ratio '{aspect_ratio}'. Must be '1:1', '16:9', or '9:16'.")
 

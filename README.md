@@ -8,6 +8,14 @@ The ad count is dictated entirely by the brief: $\text{audiences} \times \text{c
 
 > **Short pitch:** “Go Anywhere with YETI” is a modular creative-automation platform that translates natural-language or structured briefs and approved brand assets into a quality-controlled family of product, audience, regional, and social-media ad variations.
 
+### Edit layouts before generating ads
+
+Open **AD LAYOUTS → Edit placements** above **Generate Ads**. Select Square (`1:1`), Landscape (`16:9`), or Vertical (`9:16`), then drag the logo, product, or tagline in the preview. Use the placement controls for precise percentage positions, size limits, and alignment anchors. Each format is independent; **Reset layout** restores that format’s standard placement.
+
+Edits are stored in the current campaign brief’s optional `layoutOverrides` field and used by the production compositor. They apply to every ad of that size in the campaign. Loading or converting a brief that omits layout overrides preserves your current layout edits. An explicitly supplied `layoutOverrides` object replaces them; `{}` clears all overrides. Without current edits, the standard layouts apply. The generation summary labels each selected format as custom or standard. Generate again to apply edits to new output files; existing ads are unchanged. The run manifest records overrides for reproducibility.
+
+The preview uses bundled sample scenes and approved artwork, without calling an AI image service. Scene and cooler selectors only change the preview; the campaign still selects its backgrounds and audience assets during generation. Artwork retains its proportions, and editable regions are constrained to the canvas.
+
 ### 🎬 Campaign Demo Video
 
 [![Watch the YETI Ad Generator Demo Walkthrough](https://img.youtube.com/vi/4KM4Y0BZxps/hqdefault.jpg)](https://www.youtube.com/watch?v=4KM4Y0BZxps)

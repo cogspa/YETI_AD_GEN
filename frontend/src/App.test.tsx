@@ -84,6 +84,27 @@ describe('YETI Ad Generator UI', () => {
   });
 
 
+  it('preserves edited layouts across brief replacement and sends them to generation', () => {
+    vi.useFakeTimers();
+    const generate = vi.spyOn(api, 'generateCampaignAds').mockImplementation(() => new Promise(() => {}));
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /INSPECT \/ EDIT JSON/i }));
+    const editor = screen.getByLabelText(/Edit campaign JSON content/i) as HTMLTextAreaElement;
+    const brief = JSON.parse(editor.value);
+    brief.layoutOverrides = { '1:1': { product_region: {
+      x: .4, y: .5, max_width_pct: .4, max_height_pct: .4, anchor_x: 'center', anchor_y: 'center',
+    } } };
+    fireEvent.change(editor, { target: { value: JSON.stringify(brief) } });
+    fireEvent.click(screen.getByRole('button', { name: 'yeti_la_random_ad_campaign_36.json (36 Ads)' }));
+    expect(JSON.parse(editor.value).layoutOverrides).toEqual(brief.layoutOverrides);
+    expect(screen.getByText(/Layouts for this generation:/)).toHaveTextContent('1:1: custom');
+    fireEvent.click(screen.getByRole('button', { name: /GENERATE ADS/i }));
+    expect(generate).toHaveBeenCalledWith(expect.objectContaining({ layoutOverrides: brief.layoutOverrides }));
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    generate.mockRestore();
+  });
+
   it('inspect / edit JSON panel expands and displays editable JSON', () => {
     render(<App />);
 

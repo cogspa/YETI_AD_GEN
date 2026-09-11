@@ -57,12 +57,12 @@ export function NaturalLanguageBrief({ onApply }: Props) {
   return (
     <div className="natural-brief">
       <label htmlFor="natural-brief-text" className="natural-brief-title">Describe your campaign</label>
-      <p id="natural-brief-help">Tell us the audiences, locations, ages, ad count, and formats. New territories get AI-generated backgrounds. We’ll turn your description into a campaign brief you can review.</p>
+      <p id="natural-brief-help">Tell us the audiences, locations, ages, activities (e.g. skiing, hiking, beach, camping, tailgating), ad count, and formats. New territories and activities get AI-generated backgrounds. We’ll turn your description into a campaign brief you can review.</p>
       <textarea
         id="natural-brief-text"
         className="natural-brief-textarea"
         aria-describedby="natural-brief-help natural-brief-rules"
-        placeholder="For example: Create 18 YETI ads for LA beachgoers, campers, and college tailgaters…"
+        placeholder="For example: Create 18 YETI ads for LA beachgoers, skiers, campers, and college tailgaters…"
         value={text}
         onChange={(event) => updateText(event.target.value)}
         maxLength={12000}

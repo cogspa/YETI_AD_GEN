@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 
 import { Header } from './components/Header';
 import { BriefUploadSection } from './components/BriefUploadSection';
+import { LayoutEditor } from './components/LayoutEditor';
 import { CampaignSummary } from './components/CampaignSummary';
 import { AssetReadiness } from './components/AssetReadiness';
 import { IntegrationStatus } from './components/IntegrationStatus';
@@ -13,6 +14,7 @@ import { ContactSheetModal } from './components/ContactSheetModal';
 import { QualityReportModal } from './components/QualityReportModal';
 import { YETI_GO_ANYWHERE_2026_BRIEF, SAMPLE_BRIEFS } from './data/sampleBriefs';
 
+import type { AspectRatio } from './types/campaign';
 import { validateBrief } from './utils/validation';
 import {
   generateCampaignAds,
@@ -186,11 +188,25 @@ export const App: React.FC = () => {
               currentFilename={currentFilename}
               fileSizeBytes={fileSizeBytes}
               validation={validation}
-              onBriefChange={handleBriefChange}
+              onBriefChange={(brief, filename, sizeBytes) => {
+                // Preserve layout edits when a new campaign omits layout settings.
+                // An explicit layoutOverrides (including {}) replaces them.
+                const merged = brief.layoutOverrides === undefined
+                  ? { ...brief, layoutOverrides: currentBrief.layoutOverrides }
+                  : brief;
+                handleBriefChange(merged, filename, merged === brief ? sizeBytes : new Blob([JSON.stringify(merged)]).size);
+              }}
               onReset={handleReset}
             />
 
             {/* Generate Action Button directly after JSON section */}
+            <LayoutEditor brief={currentBrief} disabled={isGenerating}
+              onChange={brief => handleBriefChange(brief, currentFilename, new Blob([JSON.stringify(brief)]).size)} />
+            <p role="status" style={{ fontSize: 13 }}>
+              Layouts for this generation: {currentBrief.outputFormats.map(format =>
+                `${format.aspectRatio}: ${Object.values(currentBrief.layoutOverrides?.[format.aspectRatio as AspectRatio] || {}).some(Boolean) ? 'custom' : 'standard'}`
+              ).join(' · ')}. Layout edits apply when you generate ads again.
+            </p>
             <GenerateAction
               isValid={validation.isValid}
               totalOutputs={validation.totalOutputs}

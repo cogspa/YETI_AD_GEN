@@ -152,6 +152,33 @@ def test_two_territories_get_distinct_pools():
     assert len({a["backgroundPoolId"] for a in result["brief"]["audiences"]}) == 2
 
 
+def test_open_ended_activity_skiing_compiles_and_validates():
+    result = converter.compile_brief(intent(
+        market="Compton, California",
+        totalOutputs=6,
+        audiences=[audience(
+            name="Ed from Compton",
+            minimumAge=32,
+            maximumAge=32,
+            activity="skiing",
+            territory="Compton, California",
+            backgroundPoolId=None,
+            visualDirection="Ed skiing on snowy mountain slopes.",
+        )],
+    ))
+    valid, model, errors = validate_brief_dict(result["brief"])
+    assert valid, errors
+    brief = result["brief"]
+    assert brief["audiences"][0]["activity"] == "skiing"
+    assert brief["audiences"][0]["productColor"] == "white"
+    assert brief["audiences"][0]["taglinePoolId"] == "skiing-taglines"
+    assert len(brief["taglinePools"]) == 1
+    assert brief["taglinePools"][0]["id"] == "skiing-taglines"
+    assert brief["taglinePools"][0]["textColor"] == "#FFFFFF"
+    assert "skiing" in brief["activityRules"]
+    assert brief["activityRules"]["skiing"]["taglineTextColor"] == "#FFFFFF"
+
+
 def test_extraction_schema_is_closed_and_all_properties_required():
     schema = BriefIntent.model_json_schema()
     for item in [schema, *schema["$defs"].values()]:

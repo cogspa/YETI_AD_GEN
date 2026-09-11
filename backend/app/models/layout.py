@@ -1,7 +1,7 @@
 """Normalized Layout Configuration derived from visual reference ads."""
 
 from typing import Tuple, Optional, Literal, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 
 class NormalizedAnchor(BaseModel):
@@ -30,6 +30,36 @@ class ShadowConfig(BaseModel):
     offset_y_pct: float = 0.02
     width_scale: float = 0.85
     height_scale: float = 0.12
+
+
+class EditableRegion(NormalizedRegion):
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def within_canvas(self):
+        x_factor = {"left": 0, "center": .5, "right": 1}[self.anchor_x]
+        y_factor = {"top": 0, "center": .5, "bottom": 1}[self.anchor_y]
+        left = self.x - self.max_width_pct * x_factor
+        top = self.y - self.max_height_pct * y_factor
+        if left < -1e-7 or top < -1e-7 or left + self.max_width_pct > 1 + 1e-7 or top + self.max_height_pct > 1 + 1e-7:
+            raise ValueError("Keep the element's placement region within the canvas.")
+        return self
+
+
+class LayoutOverride(BaseModel):
+    """Only placement regions can be overridden; canvas dimensions stay fixed."""
+    model_config = ConfigDict(extra="forbid")
+    logo_region: Optional[EditableRegion] = None
+    product_region: Optional[EditableRegion] = None
+    tagline_region: Optional[EditableRegion] = None
+
+
+class LayoutPreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    aspectRatio: Literal["1:1", "16:9", "9:16"]
+    layout: Optional[LayoutOverride] = None
+    activity: Literal["beach", "camping", "tailgating"] = "camping"
+    productColor: Literal["orange", "white"] = "white"
 
 
 class RatioLayoutConfig(BaseModel):
@@ -153,4 +183,12 @@ LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
     ),
 }
 
+
+def resolve_layout(aspect_ratio: str, override: Optional[LayoutOverride] = None) -> RatioLayoutConfig:
+    if aspect_ratio not in LAYOUT_CONFIGS:
+        raise ValueError(f"Unsupported aspect ratio '{aspect_ratio}'.")
+    data = LAYOUT_CONFIGS[aspect_ratio].model_dump()
+    if override is not None:
+        data.update(override.model_dump(exclude_none=True))
+    return RatioLayoutConfig.model_validate(data)
 

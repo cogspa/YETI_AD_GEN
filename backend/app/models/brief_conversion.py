@@ -22,14 +22,10 @@ class AudienceIntent(StrictModel):
     minimumAge: int = Field(ge=20, le=120)
     maximumAge: int = Field(ge=20, le=120)
     lifeStage: str = Field(min_length=1, max_length=200)
-    activity: Literal["beach", "camping", "tailgating", "hiking", "surfing", "fishing", "climbing"]
+    activity: str = Field(min_length=1, max_length=80)
     territory: str = Field(min_length=1, max_length=200)
     visualDirection: str | None = Field(max_length=1500)
-    backgroundPoolId: Literal[
-        "tailgating-westwood", "tailgating-south-central", "beach-west-coast",
-        "camping-la-mountains", "hiking-la-trails", "surfing-pacific-coast",
-        "fishing-la-harbor", "climbing-stoney-point",
-    ] | None
+    backgroundPoolId: str | None = Field(max_length=100)
     productModel: Literal["YETI Roadie 24", "YETI Tundra 45"]
 
 

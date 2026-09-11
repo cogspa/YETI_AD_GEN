@@ -284,6 +284,7 @@ class CampaignPipelineRunner:
                         aspect_ratio=ratio,
                         tagline_color_hex=concept.tagline_color_hex,
                         logo_asset_path=concept.logo_asset_path,
+                        layout_override=brief_model.layoutOverrides.get(ratio),
                     )
                     rendered_img.save(out_path, format="PNG", optimize=True)
 
@@ -399,6 +400,7 @@ class CampaignPipelineRunner:
         manifest_data = {
             "campaignId": brief_model.campaign.id,
             "campaignName": brief_model.campaign.name,
+            "layoutOverrides": {ratio: override.model_dump(exclude_none=True) for ratio, override in brief_model.layoutOverrides.items()},
             "runId": run_id,
             "seed": effective_seed,
             "generatedAt": datetime.now(timezone.utc).isoformat(),

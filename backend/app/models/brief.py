@@ -3,6 +3,7 @@
 from typing import List, Dict, Optional, Literal, Any
 from pydantic import BaseModel, Field, field_validator, model_validator
 import re
+from backend.app.models.layout import LayoutOverride
 
 
 def validate_portable_path(path_str: str, field_name: str) -> str:
@@ -160,7 +161,7 @@ class TaglinePool(BaseModel):
             raise ValueError(
                 f"Tagline pool '{self.id}' for activity '{self.activity}' must have black text (#000000), but found '{self.textColor}'."
             )
-        if self.activity in ["camping", "tailgating", "hiking", "fishing", "climbing"] and hex_norm not in ["#FFFFFF", "#FFF", "WHITE"]:
+        if self.activity not in ["beach", "surfing"] and hex_norm not in ["#FFFFFF", "#FFF", "WHITE"]:
             raise ValueError(
                 f"Tagline pool '{self.id}' for activity '{self.activity}' must have white text (#FFFFFF), but found '{self.textColor}'."
             )
@@ -244,6 +245,7 @@ class Integrations(BaseModel):
 
 class CampaignBriefModel(BaseModel):
     schemaVersion: str
+    layoutOverrides: Dict[Literal["1:1", "16:9", "9:16"], LayoutOverride] = Field(default_factory=dict)
     campaign: CampaignMeta
     generation: GenerationSettings
     assetCatalog: Dict[str, str] = Field(default_factory=dict)
