@@ -1,4 +1,12 @@
-"""Preview approved sample assets through the production compositor; no AI calls."""
+# ==============================================================================
+# POSITION RULES: INTERACTIVE LAYOUT PREVIEW
+# ==============================================================================
+# Evaluates and previews placement rules in real-time without AI generation:
+# - Applies user-specified `layout_override` on top of canonical `RatioLayoutConfig`.
+# - Resolves element dimensions and executes `AdCompositor.compose_ad` with sample assets.
+# - Returns base64 PNG preview along with unscaled asset dimensions and canvas boundaries
+#   so the frontend LayoutEditor can position SVG draggable bounding boxes with pixel accuracy.
+# ==============================================================================
 import base64
 from io import BytesIO
 from pathlib import Path

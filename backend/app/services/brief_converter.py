@@ -152,6 +152,11 @@ def compile_brief(intent: BriefIntent) -> dict:
     brief["taglineAssets"] = copy.deepcopy(catalog["taglineAssets"])
     for color, asset in brief["taglineAssets"].items():
         asset["activities"] = sorted(a for a in activities if (a in {"beach", "surfing"}) == (color == "black"))
+    # ==============================================================================
+    # POSITION RULES & CREATIVE CONSTRAINTS:
+    # Sets creative rules including tagline placement ("lower-left"), color rules,
+    # contrast requirements, and allowed background pools for each activity.
+    # ==============================================================================
     original_activity_rules = brief["activityRules"]
     original_tagline_rules = brief["creativeRules"]["tagline"]["activityRules"]
     brief["activityRules"] = {}

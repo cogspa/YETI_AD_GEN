@@ -1,4 +1,15 @@
-"""Normalized Layout Configuration derived from visual reference ads."""
+# ==============================================================================
+# POSITION RULES: CANONICAL LAYOUT & PLACEMENT DEFINITIONS
+# ==============================================================================
+# This module defines the core position rules for all visual elements:
+# - Logo region (`logo_region`): Wordmark placement, scaling, and anchoring
+# - Product region (`product_region`): Hero cooler placement and sizing
+# - Tagline region (`tagline_region`): Campaign tagline overlay placement
+#
+# Position rules use normalized coordinates (0.0 to 1.0) relative to canvas width
+# and height. Elements are anchored (left/center/right, top/center/bottom) to ensure
+# responsive, balanced composition across Square (1:1), Landscape (16:9), and Vertical (9:16).
+# ==============================================================================
 
 from typing import Tuple, Optional, Literal, Dict
 from pydantic import BaseModel, Field, ConfigDict, model_validator
@@ -6,18 +17,19 @@ from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 class NormalizedAnchor(BaseModel):
     """Normalized position coordinate (0.0 to 1.0) with anchoring behavior."""
-    x: float = Field(ge=0.0, le=1.0, description="Normalized X coordinate")
-    y: float = Field(ge=0.0, le=1.0, description="Normalized Y coordinate")
+    x: float = Field(ge=0.0, le=1.0, description="Normalized X coordinate (0.0 = left edge, 1.0 = right edge)")
+    y: float = Field(ge=0.0, le=1.0, description="Normalized Y coordinate (0.0 = top edge, 1.0 = bottom edge)")
     anchor_x: Literal["left", "center", "right"] = "left"
     anchor_y: Literal["top", "center", "bottom"] = "top"
 
 
+# POSITION RULE SCHEMA: Defines bounding box, anchor point, and max dimension limits
 class NormalizedRegion(BaseModel):
     """Normalized bounding region (0.0 to 1.0) on canvas."""
-    x: float = Field(ge=0.0, le=1.0)
-    y: float = Field(ge=0.0, le=1.0)
-    max_width_pct: float = Field(gt=0.0, le=1.0)
-    max_height_pct: float = Field(gt=0.0, le=1.0)
+    x: float = Field(ge=0.0, le=1.0, description="Anchor X position (0.0 to 1.0)")
+    y: float = Field(ge=0.0, le=1.0, description="Anchor Y position (0.0 to 1.0)")
+    max_width_pct: float = Field(gt=0.0, le=1.0, description="Maximum width as % of canvas width")
+    max_height_pct: float = Field(gt=0.0, le=1.0, description="Maximum height as % of canvas height")
     anchor_x: Literal["left", "center", "right"] = "left"
     anchor_y: Literal["top", "center", "bottom"] = "top"
 
@@ -32,15 +44,18 @@ class ShadowConfig(BaseModel):
     height_scale: float = 0.12
 
 
+# POSITION SAFETY RULE: Enforces that user-adjusted placement regions stay fully within canvas bounds
 class EditableRegion(NormalizedRegion):
     model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="after")
     def within_canvas(self):
+        # Calculate bounding box edges based on anchor point
         x_factor = {"left": 0, "center": .5, "right": 1}[self.anchor_x]
         y_factor = {"top": 0, "center": .5, "bottom": 1}[self.anchor_y]
         left = self.x - self.max_width_pct * x_factor
         top = self.y - self.max_height_pct * y_factor
+        # Guard against element overflowing top, left, right, or bottom canvas boundaries
         if left < -1e-7 or top < -1e-7 or left + self.max_width_pct > 1 + 1e-7 or top + self.max_height_pct > 1 + 1e-7:
             raise ValueError("Keep the element's placement region within the canvas.")
         return self
@@ -77,7 +92,22 @@ class RatioLayoutConfig(BaseModel):
     shadow: ShadowConfig = ShadowConfig()
 
 
-# Canonical Layout Definitions (Centered Composition)
+# ==============================================================================
+# POSITION RULES: CANONICAL FORMAT SPECIFICATIONS
+# ==============================================================================
+# 1:1 (Square, 1080x1080):
+#   - Logo: Top-centered (x=50%, y=8.5%, max width 43.7%, max height 15.6%)
+#   - Product: Center-anchored (x=50%, y=52%, max width 68%, max height 60%)
+#   - Tagline: Bottom-centered (x=50%, 65px above bottom edge, max width 84%)
+# 16:9 (Landscape, 1920x1080):
+#   - Logo: Top-centered (x=50%, y=8.5%, max width 28.1%, max height 15.6%)
+#   - Product: Center-anchored (x=50%, y=52%, max width 47.8%, max height 62.6%)
+#   - Tagline: Bottom-centered (x=50%, 65px above bottom edge, max width 68.4%)
+# 9:16 (Vertical, 1080x1920):
+#   - Logo: Top-centered (x=50%, y=8.5%, max width 46.8%, max height 12.5%)
+#   - Product: Center-anchored (x=50%, y=48%, max width 68.4%, max height 45%)
+#   - Tagline: Lower-centered (x=50%, y=88%, max width 83.4%, max height 15.5%)
+# ==============================================================================
 LAYOUT_CONFIGS: Dict[str, RatioLayoutConfig] = {
     "1:1": RatioLayoutConfig(
         aspect_ratio="1:1",

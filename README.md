@@ -96,7 +96,7 @@ Open **`http://localhost:5173`** in your browser.
 ## Table of Contents
 1. [Project & Business Overview](#1-project--business-overview)
 2. [Web UI Control Center](#2-web-ui-control-center)
-3. [Three Sample-Ad Layout References](#3-three-sample-ad-layout-references)
+3. [Ad Layouts, Position Rules & Interactive Layout Editor](#3-ad-layouts-position-rules--interactive-layout-editor)
 4. [Architecture Overview](#4-architecture-overview)
 5. [18-Ad Baseline vs. 72-Ad Gemini Multi-Demographic Campaign](#5-18-ad-baseline-vs-72-ad-gemini-multi-demographic-campaign)
 6. [Campaign Rules Matrix & Demographic Expansion](#6-campaign-rules-matrix--demographic-expansion)
@@ -159,9 +159,9 @@ A full interactive web application for creative directors, campaign managers, an
 
 ---
 
-## 3. Three Sample-Ad Layout References
+## 3. Ad Layouts, Position Rules & Interactive Layout Editor
 
-The compositor uses defined layout configurations per aspect ratio to preserve packshot geometry and maximize visual impact:
+The compositor uses deterministic layout rules and coordinate grids per aspect ratio to preserve packshot geometry, maintain brand legibility, and maximize visual engagement across platforms:
 
 ```
 ┌───────────────────────────┐  ┌───────────────────────────────────────┐  ┌───────────────────────────┐
@@ -183,20 +183,81 @@ The compositor uses defined layout configurations per aspect ratio to preserve p
                                                                                (1080 × 1920)
 ```
 
-### Layout Specifications
+### 1. Canonical Layout & Position Rules
+
+Every format has a dedicated `RatioLayoutConfig` defined in [`backend/app/models/layout.py`](backend/app/models/layout.py):
 
 - **1:1 Square (1080×1080)** — Instagram Feed, Facebook Feed, eCommerce tiles.
-  - **Logo**: centered, top 6% (width: 220px).
-  - **Tagline**: centered, top 20% (width: 480px).
-  - **Product**: centered, top 52% (width: 600px).
+  - **Logo (`logo_region`)**: Top-centered (`x=0.50`, `y=0.085`, `anchor=center/top`, max width: 43.7%, max height: 15.6%).
+  - **Product (`product_region`)**: Center-anchored (`x=0.50`, `y=0.52`, `anchor=center/center`, max width: 68%, max height: 60%).
+  - **Tagline (`tagline_region`)**: Bottom-centered (`x=0.50`, `y=94%`, `anchor=center/bottom`, max width: 84%, max height: 18%).
+  - **Safe Margins**: 6.5% X / 6.5% Y margin buffer.
 - **16:9 Landscape (1920×1080)** — YouTube pre-roll, desktop display, connected TV.
-  - **Logo**: top-left (left: 8%, top: 10%, width: 240px).
-  - **Tagline**: left-aligned beneath logo (left: 8%, top: 26%, lowered 10pt for breathing room, 5% smaller than base).
-  - **Product**: right hemisphere (left: 60%, top: 52%, 8% smaller to prevent crowding).
+  - **Logo (`logo_region`)**: Top-centered (`x=0.50`, `y=0.085`, `anchor=center/top`, max width: 28.1%, max height: 15.6%).
+  - **Product (`product_region`)**: Center-anchored (`x=0.50`, `y=0.52`, `anchor=center/center`, max width: 47.8%, max height: 62.6%).
+  - **Tagline (`tagline_region`)**: Bottom-centered (`x=0.50`, `y=94%`, `anchor=center/bottom`, max width: 68.4%, max height: 19%).
+  - **Safe Margins**: 5.5% X / 7.0% Y margin buffer.
 - **9:16 Vertical (1080×1920)** — Instagram Stories, TikTok, YouTube Shorts, Reels.
-  - **Logo**: centered, top 6% (width: 240px).
-  - **Tagline**: centered, top 18% (3% smaller for vertical balance).
-  - **Product**: centered, top: 56%, 10% smaller to respect 250px UI safe zones top and bottom.
+  - **Logo (`logo_region`)**: Top-centered (`x=0.50`, `y=0.085`, `anchor=center/top`, max width: 46.8%, max height: 12.5%).
+  - **Product (`product_region`)**: Center-anchored (`x=0.50`, `y=0.48`, `anchor=center/center`, max width: 68.4%, max height: 45%).
+  - **Tagline (`tagline_region`)**: Lower-centered (`x=0.50`, `y=0.88`, `anchor=center/bottom`, max width: 83.4%, max height: 15.5%).
+  - **Safe Margins**: 8.0% X / 9.0% Y margin buffer guarding against platform UI overlays.
+
+---
+
+### 2. Interactive Layout Editor (UI Control Center)
+
+The web dashboard features a visual **AD LAYOUTS** editor located directly above **Generate Ads** in the Campaign Summary panel:
+
+- **Format Selection Tabs**: Switch between **Square (`1:1`)**, **Landscape (`16:9`)**, and **Vertical (`9:16`)** with dot indicators showing which formats have custom overrides.
+- **Interactive Drag & Nudge Canvas**:
+  - Click and drag the **Logo**, **Product**, or **Tagline** bounding boxes directly on the canvas preview.
+  - Select an element and use keyboard arrow keys (`Left`, `Right`, `Up`, `Down`) for fine 0.5% pixel nudging (`Shift + Arrow` for 2% steps).
+- **Placement Controls**:
+  - **Element Selector**: Choose between `Product`, `Logo`, and `Tagline`.
+  - **Horizontal position (%)**: Fine-tune X coordinate (0.0% to 100.0%).
+  - **Vertical position (%)**: Fine-tune Y coordinate (0.0% to 100.0%).
+  - **Maximum width (%)**: Percentage cap preventing element from crowding the frame.
+  - **Maximum height (%)**: Percentage cap preventing element vertical overflow.
+  - **Horizontal Anchor**: Alignment origin (`Left`, `Center`, `Right`).
+  - **Vertical Anchor**: Alignment origin (`Top`, `Center`, `Bottom`).
+  - **Reset Layout**: Reverts current format back to standard canonical placement.
+- **Live Preview Scene & Cooler Selectors**:
+  - Test layouts in real-time against sample background environments (**Camping**, **Beach**, **Tailgating**).
+  - Toggle between **White** and **Orange** cooler packshots.
+  - Generates instant composited previews via `POST /api/layout/preview` using local PIL rendering with zero external AI latency or cost.
+
+---
+
+### 3. Position Safety & Boundary Clamping
+
+- **Canvas Boundary Clamping**: The backend [`EditableRegion`](backend/app/models/layout.py) and frontend [`constrainRegion`](frontend/src/components/LayoutEditor.tsx) enforce that no placement box can spill outside the canvas boundaries, taking anchor offsets into account.
+- **Zero Packshot Distortion**: Packshots and logos scale proportionally to fit within their maximum width and height limits using Lanczos resampling; they are never stretched or warped.
+- **Shadow Synchronization**: When product placement is adjusted, its soft elliptical contact shadow automatically calculates its position and offset relative to the new product coordinates.
+
+---
+
+### 4. Brief Persistence & Pipeline Execution
+
+- **Campaign Brief Overrides**: Custom placement edits are saved directly into the brief's `layoutOverrides` dictionary:
+  ```json
+  {
+    "layoutOverrides": {
+      "1:1": {
+        "product_region": {
+          "x": 0.579,
+          "y": 0.519,
+          "max_width_pct": 0.35,
+          "max_height_pct": 0.35,
+          "anchor_x": "left",
+          "anchor_y": "center"
+        }
+      }
+    }
+  }
+  ```
+- **State Preservation**: Layout edits are retained when switching between briefs or converting natural-language prompts.
+- **Manifest Provenance**: The generation pipeline passes `layoutOverrides` into `AdCompositor.compose_ad` and logs active overrides in `generation-manifest.json` for deterministic auditability.
 
 ---
 

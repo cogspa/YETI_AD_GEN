@@ -105,6 +105,19 @@ def fit_within_region(
     return scaled, new_w, new_h
 
 
+# ==============================================================================
+# POSITION RULES: PIXEL COORDINATE CALCULATION
+# ==============================================================================
+# Converts normalized region coordinates (0.0 to 1.0) and anchor alignments into
+# exact top-left integer pixel coordinates (pos_x, pos_y) for PIL drawing.
+# Anchor rules:
+#   - anchor_x: 'left' -> pos_x = base_x
+#               'center' -> pos_x = base_x - (element_w // 2)
+#               'right' -> pos_x = base_x - element_w
+#   - anchor_y: 'top' -> pos_y = base_y
+#               'center' -> pos_y = base_y - (element_h // 2)
+#               'bottom' -> pos_y = base_y - element_h
+# ==============================================================================
 def calculate_anchor_coords(
     region: NormalizedRegion,
     element_w: int,
@@ -361,6 +374,9 @@ class AdCompositor:
 
 
         # 3. Product Sizing and Position
+        # POSITION RULE APPLICATION (Product):
+        # Scale product packshot to fit within max_width_pct and max_height_pct, then
+        # compute (prod_x, prod_y) using product_region's anchor rules (default center/center).
         max_prod_w = int(layout.product_region.max_width_pct * W)
         max_prod_h = int(layout.product_region.max_height_pct * H)
         scaled_prod, prod_w, prod_h = fit_within_region(product_img, max_prod_w, max_prod_h)
@@ -399,7 +415,10 @@ class AdCompositor:
         canvas.paste(prod_rgba, (prod_x, prod_y), prod_rgba)
 
 
-        # 5. Tagline Layer (Image Overlay or Programmatic Text)
+        # 7. Tagline Layer (Image Overlay or Programmatic Text)
+        # POSITION RULE APPLICATION (Tagline):
+        # Scale tagline overlay to fit within tagline_region bounding box, then
+        # compute (tag_x, tag_y) using tagline_region anchor rules (default bottom/center).
         max_tag_w = int(layout.tagline_region.max_width_pct * W)
         max_tag_h = int(layout.tagline_region.max_height_pct * H)
 
@@ -421,7 +440,10 @@ class AdCompositor:
         )
         canvas.paste(tag_rgba, (tag_x, tag_y), tag_rgba)
 
-        # 6. Brand Logo Layer
+        # 8. Brand Logo Layer
+        # POSITION RULE APPLICATION (Logo):
+        # Scale wordmark to fit within logo_region bounding box, then
+        # compute (logo_x, logo_y) using logo_region anchor rules (default top/center).
         max_logo_w = int(layout.logo_region.max_width_pct * W)
         max_logo_h = int(layout.logo_region.max_height_pct * H)
         scaled_logo, logo_w, logo_h = fit_within_region(logo_img, max_logo_w, max_logo_h)

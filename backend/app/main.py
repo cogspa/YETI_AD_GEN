@@ -16,13 +16,24 @@ from backend.app.services.brief_converter import BriefConversionError, convert_n
 from backend.app.services.asset_resolver import AssetResolver
 
 
+# ==============================================================================
+# GOOGLE CLOUD RUN BACKEND SERVICE
+# ==============================================================================
+# This FastAPI application is deployed as a containerized service on Google Cloud Run:
+# - Service Name: yeti-ad-backend
+# - GCP Project: aividport (Region: us-central1)
+# - Public URL: https://yeti-ad-backend-545916247776.us-central1.run.app
+# - Environment: Stateless container with auto-scaling to zero instances when idle.
+# - Port: Dynamically assigned via $PORT environment variable by Cloud Run.
+# ==============================================================================
+
 app = FastAPI(
     title="YETI Ad Generator API",
-    description="Creative Automation backend for scalable social campaigns.",
+    description="Creative Automation backend for scalable social campaigns on Google Cloud Run.",
     version="1.0.0",
 )
 
-# CORS middleware for local Vite frontend and Netlify deployments
+# CORS middleware for local Vite frontend, Netlify deployments, and Google Cloud Run
 cors_origins_env = os.getenv("CORS_ORIGINS", "")
 allowed_origins = [
     "http://localhost:5173",

@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { App } from './App';
 import * as api from './services/api';
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 
 describe('YETI Ad Generator UI', () => {
@@ -88,7 +93,7 @@ describe('YETI Ad Generator UI', () => {
     vi.useFakeTimers();
     const generate = vi.spyOn(api, 'generateCampaignAds').mockImplementation(() => new Promise(() => {}));
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /INSPECT \/ EDIT JSON/i }));
+    fireEvent.click(screen.getAllByRole('button', { name: /INSPECT \/ EDIT JSON/i })[0]);
     const editor = screen.getByLabelText(/Edit campaign JSON content/i) as HTMLTextAreaElement;
     const brief = JSON.parse(editor.value);
     brief.layoutOverrides = { '1:1': { product_region: {

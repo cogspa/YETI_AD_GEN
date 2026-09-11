@@ -25,6 +25,14 @@ export interface AssetReadinessReport {
   summary_messages: string[];
 }
 
+// ==============================================================================
+// GOOGLE CLOUD RUN API CLIENT CONFIGURATION
+// ==============================================================================
+// In production, `API_BASE` is empty (`""`), meaning requests route through Netlify's
+// edge proxy (`/api/*`), which transparently forwards traffic to the Google Cloud Run
+// service (`https://yeti-ad-backend-545916247776.us-central1.run.app/api/*`).
+// In local development, `VITE_API_URL` can point to `http://localhost:8000` or Cloud Run.
+// ==============================================================================
 export const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL ? String(import.meta.env.VITE_API_URL).replace(/\/$/, '') : '');
 
 export async function fetchDefaultLayouts(): Promise<Record<AspectRatio, DefaultLayout>> {

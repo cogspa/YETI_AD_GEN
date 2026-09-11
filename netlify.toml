@@ -5,6 +5,14 @@
   command = "npm run build"
   publish = "dist"
 
+# ==============================================================================
+# GOOGLE CLOUD RUN BACKEND PROXY
+# ==============================================================================
+# The Netlify frontend proxies API calls directly to the serverless Google Cloud Run
+# service instance (`yeti-ad-backend`). This eliminates CORS preflight complexity
+# in production and keeps the API surface unified under https://yeti-ad-generator.netlify.app/api/*
+# ==============================================================================
+
 # Proxy /api requests to live Google Cloud Run backend
 [[redirects]]
   from = "/api/*"

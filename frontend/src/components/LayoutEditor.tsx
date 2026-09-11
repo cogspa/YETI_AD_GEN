@@ -1,3 +1,16 @@
+// ==============================================================================
+// POSITION RULES: FRONTEND INTERACTIVE LAYOUT EDITOR
+// ==============================================================================
+// Provides real-time interactive positioning for ad artwork:
+// - Layers: Logo (`logo_region`), Product (`product_region`), Tagline (`tagline_region`)
+// - Formats: Square (`1:1`), Landscape (`16:9`), Vertical (`9:16`)
+//
+// Position rule enforcement:
+// - `constrainRegion`: Guarantees element boundaries stay 100% within canvas limits
+// - `elementBounds`: Calculates responsive CSS percentage coordinates from normalized anchors
+// - Saves overrides to `brief.layoutOverrides` for ingestion by the backend PIL compositor.
+// ==============================================================================
+
 import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent, KeyboardEvent } from 'react';
 import type { AspectRatio, CampaignBrief, DefaultLayout, LayerName, LayoutRegion } from '../types/campaign';
@@ -8,6 +21,7 @@ const LABELS = { logo_region: 'Logo', product_region: 'Product', tagline_region:
 const RATIOS: AspectRatio[] = ['1:1', '16:9', '9:16'];
 const FORMAT_LABELS = { '1:1': 'Square', '16:9': 'Landscape', '9:16': 'Vertical' };
 
+// POSITION RULE: Bounds enforcement clamping anchor coordinates within canvas boundaries
 export function constrainRegion(region: LayoutRegion): LayoutRegion {
   const width = Math.max(.01, Math.min(1, region.max_width_pct));
   const height = Math.max(.01, Math.min(1, region.max_height_pct));
@@ -18,6 +32,7 @@ export function constrainRegion(region: LayoutRegion): LayoutRegion {
     y: Math.max(height * ay, Math.min(1 - height * (1 - ay), region.y)) };
 }
 
+// POSITION RULE: Translate normalized anchor and dimensions to CSS bounding percentages
 function elementBounds(region: LayoutRegion, size: [number, number], width: number, height: number) {
   const scale = Math.min(Math.floor(region.max_width_pct * width) / size[0], Math.floor(region.max_height_pct * height) / size[1]);
   const w = Math.max(1, Math.floor(size[0] * scale));
